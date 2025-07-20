@@ -34,30 +34,32 @@ import (
 
 var cfgFile string
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "zest",
-	Short: "Manage multiple workspaces from a unified CLI",
-	Long: `zest is a command-line tool to manage different workspaces with a simple
-interface across platforms.
-
-You can create and switch between isolated workspaces such as work, personal, or learning.
-Each workspace can be initialized with custom templates for different use cases.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
-}
+// RootCmd represents the base command when called without any subcommands
+var RootCmd *cobra.Command
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// This is called by main.main(). It only needs to happen once to the RootCmd.
 func Execute() {
-	err := rootCmd.Execute()
+	err := RootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}
 }
 
-func init() {
+func NewRootCmd() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "zest",
+		Short: "Manage multiple workspaces from a unified CLI",
+		Long: `zest is a command-line tool to manage different workspaces with a simple
+interface across platforms.
+
+You can create and switch between isolated workspaces such as work, personal, or learning.
+Each workspace can be initialized with custom templates for different use cases.`,
+		// Uncomment the following line if your bare application
+		// has an action associated with it:
+		// Run: func(cmd *cobra.Command, args []string) { },
+	}
+
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(initCmd)
 
@@ -65,11 +67,17 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zest.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zest/zest.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	return rootCmd
+}
+
+func init() {
+	RootCmd = NewRootCmd()
 }
 
 // initConfig reads in config file and ENV variables if set.

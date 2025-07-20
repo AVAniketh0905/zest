@@ -45,7 +45,7 @@ work, personal, or learning projects.
   zest init -n personal --template journal
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called with", name)
+		fmt.Fprintln(cmd.OutOrStdout(), "init called with", name)
 	},
 }
 

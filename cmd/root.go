@@ -1,13 +1,33 @@
 /*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+Copyright © 2025 AVAniketh0905
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 */
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 
-	"github.com/AVAniketh0905/zest/cmd/initialize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -17,13 +37,12 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "zest",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "Manage multiple workspaces from a unified CLI",
+	Long: `zest is a command-line tool to manage different workspaces with a simple
+interface across platforms.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+You can create and switch between isolated workspaces such as work, personal, or learning.
+Each workspace can be initialized with custom templates for different use cases.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -40,7 +59,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.AddCommand(initialize.InitCmd)
+	rootCmd.AddCommand(initCmd)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -62,11 +81,24 @@ func initConfig() {
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
+		cfgPath := filepath.Join(home, ".zest")
 
-		// Search config in home directory with name ".zest" (without extension).
-		viper.AddConfigPath(home)
+		// only responsible for setting config dir
+		if _, err = os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
+			err := os.Mkdir(cfgPath, os.ModePerm)
+			if err != nil {
+				log.Fatalf("error: creating global config dir, %s", err)
+			}
+
+			//	log.Println("created dir at, ", cfgPath)
+		} else if err != nil {
+			log.Fatalf("error: unexpected checking config file, %s", err)
+		}
+
+		// config path at $HOME/.zest/zest.yaml
+		viper.AddConfigPath(cfgPath)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".zest")
+		viper.SetConfigName("zest")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

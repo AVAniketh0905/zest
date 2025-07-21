@@ -7,16 +7,16 @@ import (
 	"github.com/AVAniketh0905/zest/cmd"
 )
 
-func TestInitName(t *testing.T) {
+func TestVersion(t *testing.T) {
 	testCases := []struct {
 		args     []string
 		fail     bool
 		expected string
 	}{
-		{args: []string{"init", "personal"}, fail: true, expected: "Error: required flag(s) \"name\" not set\n"},
-		{args: []string{"init"}, fail: true, expected: "Error: required flag(s) \"name\" not set\n"},
-		{args: []string{"init", "-n", "work"}, fail: false, expected: "Initialized the workspace, work\n"},
-		{args: []string{"init", "--name", "personal"}, fail: false, expected: "Initialized the workspace, personal\n"},
+		{args: []string{"init", "-v"}, fail: true, expected: "Error: unknown shorthand flag: 'v' in -v\n"},
+		{args: []string{"init", "--version"}, fail: true, expected: "Error: unknown flag: --version\n"},
+		{args: []string{"-v"}, fail: false, expected: "zest: Manage multiple workspaces from a unified CLI - version 0.1.0\n"},
+		{args: []string{"--version"}, fail: false, expected: "zest: Manage multiple workspaces from a unified CLI - version 0.1.0\n"},
 	}
 
 	for _, tc := range testCases {

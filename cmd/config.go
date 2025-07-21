@@ -27,25 +27,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	name string
-)
+// configCmd represents the config command
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
 
-// initCmd represents the init command
-var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize a new workspace",
-	Long: `The init command creates a new workspace with the given name, setting up the
-necessary directory structure and optional template files.
-
-Workspaces are isolated environments used for organizing different contexts like
-work, personal, or learning projects.
-`,
-	Example: `  zest init --name works 
-  zest init -n personal --template journal
-`,
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", name)
+		fmt.Println("config called")
 	},
 }
 
@@ -54,10 +47,9 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// configCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	initCmd.Flags().StringVarP(&name, "name", "n", "", "name of the workspace (required)")
-	cobra.CheckErr(initCmd.MarkFlagRequired("name"))
+	// configCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

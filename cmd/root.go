@@ -32,7 +32,13 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+)
+
+const (
+	VERSION = "0.1.0"
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd *cobra.Command
@@ -55,6 +61,7 @@ interface across platforms.
 
 You can create and switch between isolated workspaces such as work, personal, or learning.
 Each workspace can be initialized with custom templates for different use cases.`,
+		Version: VERSION,
 		// Uncomment the following line if your bare application
 		// has an action associated with it:
 		// Run: func(cmd *cobra.Command, args []string) { },
@@ -62,6 +69,7 @@ Each workspace can be initialized with custom templates for different use cases.
 
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(configCmd)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -72,6 +80,10 @@ Each workspace can be initialized with custom templates for different use cases.
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	// Version
+	versionTemplate := `{{printf "%s: %s - version %s\n" .Name .Short .Version}}`
+	rootCmd.SetVersionTemplate(versionTemplate)
 
 	return rootCmd
 }

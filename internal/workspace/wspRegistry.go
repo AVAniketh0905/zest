@@ -20,7 +20,7 @@ type WspRegistry struct {
 
 // NewWspRegistry loads the registry from disk or initializes an empty one.
 func NewWspRegistry() (*WspRegistry, error) {
-	regPath := filepath.Join(utils.ZestStateDir, "workspaces.json")
+	regPath := filepath.Join(utils.ZestStateDir(), "workspaces.json")
 
 	reg := &WspRegistry{
 		Workspaces: make(map[string]string),
@@ -29,7 +29,7 @@ func NewWspRegistry() (*WspRegistry, error) {
 
 	// Try to read from disk if exists
 	if data, err := os.ReadFile(regPath); err == nil {
-		if err := json.Unmarshal(data, &reg.Workspaces); err != nil {
+		if err := json.Unmarshal(data, &reg); err != nil {
 			return nil, err
 		}
 	}

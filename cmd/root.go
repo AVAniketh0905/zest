@@ -30,16 +30,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	cfgFile string
-)
-
 const (
 	VERSION = "0.1.0"
 )
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd *cobra.Command
+
+// config file
+var cfgFile string
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the RootCmd.
@@ -48,6 +47,13 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+
+}
+
+// placeholder for all subcommands
+func addCommands(rootCmd *cobra.Command) {
+	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 func NewRootCmd() *cobra.Command {
@@ -65,15 +71,13 @@ Each workspace can be initialized with custom templates for different use cases.
 		// Run: func(cmd *cobra.Command, args []string) { },
 	}
 
-	cobra.OnInitialize(initConfig)
-	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(configCmd)
-
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zest/zest.yaml)")
+
+	// custom path to zest directory
+	rootCmd.PersistentFlags().StringVar(&utils.CustomZestDir, "custom", "", "custom zest directory (default is $HOME/.zest)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -82,6 +86,10 @@ Each workspace can be initialized with custom templates for different use cases.
 	// Version
 	versionTemplate := `{{printf "%s: %s - version %s\n" .Name .Short .Version}}`
 	rootCmd.SetVersionTemplate(versionTemplate)
+
+	// initialization
+	cobra.OnInitialize(initConfig)
+	addCommands(rootCmd)
 
 	return rootCmd
 }

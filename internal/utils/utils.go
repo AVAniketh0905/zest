@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -9,20 +8,31 @@ import (
 type ZestErr error
 
 var (
-	ZestWspDir   = filepath.Join(ZestDir(), "workspaces")
-	ZestStateDir = filepath.Join(ZestDir(), "state")
+	CustomZestDir string
 )
 
 func ZestDir() string {
+	if CustomZestDir != "" {
+		return filepath.Join(CustomZestDir, ".zest")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".zest")
 }
 
+func ZestWspDir() string {
+	return filepath.Join(ZestDir(), "workspaces")
+}
+
+func ZestStateDir() string {
+	return filepath.Join(ZestDir(), "state")
+}
+
 func EnsureZestDirs() error {
 	dirs := []string{
-		ZestWspDir,
-		ZestStateDir,
-		filepath.Join(ZestStateDir, "workspaces"),
+		ZestDir(),
+		ZestWspDir(),
+		ZestStateDir(),
+		filepath.Join(ZestStateDir(), "workspaces"),
 	}
 
 	for _, dir := range dirs {

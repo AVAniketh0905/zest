@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
@@ -12,8 +13,9 @@ import (
 )
 
 var (
-	ErrWorkspaceExists    utils.ZestErr = errors.New("workspace already exists")
-	ErrWorkspaceNotExists utils.ZestErr = errors.New("workspace does not exist")
+	ErrInvalidWorkspaceName utils.ZestErr = errors.New("invalid workspace name")
+	ErrWorkspaceExists      utils.ZestErr = errors.New("workspace already exists")
+	ErrWorkspaceNotExists   utils.ZestErr = errors.New("workspace does not exist")
 )
 
 // WspConfig represents the user-defined configuration for a single workspace.
@@ -27,20 +29,24 @@ type WspConfig struct {
 }
 
 // returns true if workspace with the given name already exists
-func checkName(name string) bool {
-	file := fmt.Sprintf("%v.yaml", name)
-	wspPath := filepath.Join(utils.ZestWspDir, file)
-
-	if _, err := os.Stat(wspPath); errors.Is(err, os.ErrNotExist) {
-		return false
+func checkName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return ErrInvalidWorkspaceName
 	}
 
-	return true
+	file := fmt.Sprintf("%v.yaml", name)
+	wspPath := filepath.Join(utils.ZestWspDir(), file)
+
+	if _, err := os.Stat(wspPath); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	return ErrWorkspaceExists
 }
 
 func Init(name, template string) error {
-	if checkName(name) {
-		return ErrWorkspaceExists
+	if err := checkName(name); err != nil {
+		return err
 	}
 
 	reg, err := NewWspRegistry()
@@ -52,7 +58,7 @@ func Init(name, template string) error {
 		Name:     name,
 		Template: template,
 		Created:  time.Now().Format(time.RFC3339),
-		Path:     filepath.Join(utils.ZestWspDir, name+".yaml"),
+		Path:     filepath.Join(utils.ZestWspDir(), name+".yaml"),
 	}
 
 	// TODO: for now writing only path to yaml file

@@ -22,12 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
 
+	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -99,21 +97,21 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-		cfgPath := filepath.Join(home, ".zest")
+		cfgPath := utils.ZestDir()
 
-		// only responsible for setting config dir
-		if _, err = os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
-			err := os.Mkdir(cfgPath, os.ModePerm)
-			if err != nil {
-				log.Fatalf("error: creating global config dir, %s", err)
-			}
-
-			//	log.Println("created dir at, ", cfgPath)
-		} else if err != nil {
-			log.Fatalf("error: unexpected checking config file, %s", err)
-		}
+		// Zest configuration and state directory structure:
+		//
+		// $HOME/.zest/
+		// ├── zest.yaml                        // Global configuration file (user editable)
+		// ├── workspace/                       // Per-workspace configuration (user editable)
+		// │   ├── [name of wsp].yaml           // Config for each workspace
+		// ├── state/                           // Internal state files (NOT user editable)
+		// │   ├── workspace.json               // Overall state of all workspaces
+		// │   ├── other_future_cmds.json       // Additional future commands/state
+		// │   └── workspace/                   // Per-workspace state files
+		// │       ├── [name of wsp].json       // State for each workspace
+		// Check for necessary directories.
+		cobra.CheckErr(utils.EnsureZestDirs())
 
 		// config path at $HOME/.zest/zest.yaml
 		viper.AddConfigPath(cfgPath)

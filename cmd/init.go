@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +45,14 @@ work, personal, or learning projects.
 	Example: `  zest init --name works 
   zest init -n personal --template journal
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", name)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := workspace.Init(name, "") // TODO: template
+		if err != nil {
+			return err
+		}
+
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", name)
+		return err
 	},
 }
 

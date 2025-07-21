@@ -42,3 +42,8 @@ func TestInitName(t *testing.T) {
 		}
 	}
 }
+
+// TODO: test for checking created wsp
+func TestInitWorkspace(t *testing.T) {
+
+}

@@ -12,6 +12,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type Status string
+
+var (
+	Active   Status = "active"
+	Inactive Status = "inactive"
+)
+
 var (
 	ErrInvalidWorkspaceName utils.ZestErr = errors.New("invalid workspace name")
 	ErrWorkspaceExists      utils.ZestErr = errors.New("workspace already exists")
@@ -21,11 +28,16 @@ var (
 // WspConfig represents the user-defined configuration for a single workspace.
 // This is stored as a YAML file under ~/.zest/workspace/<name>.yaml
 type WspConfig struct {
-	Name string `json:"name" yaml:"name"`
-	Path string `json:"workspace_dir" yaml:"workspace_dir"`
+	Name   string `json:"name" yaml:"name"`
+	Path   string `json:"path" yaml:"path"`
+	Status Status `json:"status" yaml:"status"`
+
+	WorkspaceDir string `json:"workspace_dir" yaml:"workspace_dir"`
 
 	Template string `json:"template,omitempty" yaml:"template,omitempty"`
+
 	Created  string `json:"created" yaml:"created"`
+	LastUsed string `json:"last_used" yaml:"last_used"`
 }
 
 // returns true if workspace with the given name already exists
@@ -56,13 +68,15 @@ func Init(name, template string) error {
 
 	cfg := WspConfig{
 		Name:     name,
+		Status:   Inactive,
 		Template: template,
 		Created:  time.Now().Format(time.RFC3339),
 		Path:     filepath.Join(utils.ZestWspDir(), name+".yaml"),
+		LastUsed: "never",
 	}
 
 	// TODO: for now writing only path to yaml file
-	data, err := yaml.Marshal(cfg.Path)
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal yaml file, %s", err)
 	}

@@ -42,7 +42,7 @@ If no workspace name is provided, the status of all open workspaces will be show
  zest status personal --verbose
  zest status --json`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("status called")
+		fmt.Fprintln(cmd.OutOrStdout(), "status called")
 	},
 }
 

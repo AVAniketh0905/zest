@@ -23,7 +23,12 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+	"text/tabwriter"
 
+	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -39,8 +44,8 @@ last used timestamp, and configuration file path.`,
 	Example: ` zest list
  zest list --json
  zest list --filter open`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintln(cmd.OutOrStdout(), "list called")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return listWorkspaces(cmd.OutOrStdout())
 	},
 }
 
@@ -54,4 +59,35 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func listWorkspaces(w io.Writer) error {
+	wspReg, err := workspace.NewWspRegistry()
+	if err != nil {
+		return err
+	}
+
+	// Initialize a tab writer
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+
+	// Print header
+	fmt.Fprintln(tw, "NAME\tSTATUS\tLAST_USED\tPATH")
+
+	// Loop and print each workspace
+	for _, wsp := range wspReg.Workspaces {
+		_, trimPath, found := strings.Cut(wsp.Path, ".")
+		if found {
+			trimPath = filepath.Join("~", "."+trimPath)
+		}
+
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+			wsp.Name,
+			wsp.Status,
+			wsp.LastUsed,
+			trimPath,
+		)
+	}
+
+	// Flush to ensure output is written
+	return tw.Flush()
 }

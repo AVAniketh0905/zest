@@ -15,7 +15,7 @@ import (
 type WspRegistry struct {
 	path string
 
-	Workspaces map[string]string `json:"workspaces"` // key = workspace name, value = path to its config YAML file
+	Workspaces map[string]WspConfig `json:"workspaces"` // key = workspace name, value = path to its config YAML file
 }
 
 // NewWspRegistry loads the registry from disk or initializes an empty one.
@@ -23,8 +23,8 @@ func NewWspRegistry() (*WspRegistry, error) {
 	regPath := filepath.Join(utils.ZestStateDir(), "workspaces.json")
 
 	reg := &WspRegistry{
-		Workspaces: make(map[string]string),
 		path:       regPath,
+		Workspaces: map[string]WspConfig{},
 	}
 
 	// Try to read from disk if exists
@@ -39,7 +39,7 @@ func NewWspRegistry() (*WspRegistry, error) {
 
 // Update adds or updates a workspace in the registry.
 func (wr *WspRegistry) Update(cfg *WspConfig) {
-	wr.Workspaces[cfg.Name] = cfg.Path
+	wr.Workspaces[cfg.Name] = *cfg
 }
 
 // Save writes the current state of the registry to disk.
@@ -56,8 +56,8 @@ func (wr *WspRegistry) Save() error {
 
 // GetPath returns the config path for a workspace name.
 func (wr *WspRegistry) GetPath(name string) (string, bool) {
-	path, ok := wr.Workspaces[name]
-	return path, ok
+	cfg, ok := wr.Workspaces[name]
+	return cfg.Path, ok
 }
 
 // Exists checks if a workspace with the given name exists.

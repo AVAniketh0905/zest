@@ -66,6 +66,15 @@ func (wr *WspRegistry) GetPath(name string) (string, bool) {
 	return cfg.Path, ok
 }
 
+// GetNames returns slice of names of the workspaces
+func (wr *WspRegistry) GetNames() []string {
+	out := []string{}
+	for _, wsp := range wr.Workspaces {
+		out = append(out, wsp.Name)
+	}
+	return out
+}
+
 // Exists checks if a workspace with the given name exists.
 func (wr *WspRegistry) Exists(name string) bool {
 	_, ok := wr.Workspaces[name]

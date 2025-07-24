@@ -1,8 +1,12 @@
 package workspace
 
+import "sync"
+
 // WspRuntime captures the live state of a running workspace session.
 // This is stored as a JSON file at ~/.zest/state/workspaces/<workspace-id>.json
 type WspRuntime struct {
+	sync.Mutex
+
 	Name      string `json:"name"`       // Name of the workspace (duplicated for quick access)
 	StartedAt string `json:"started_at"` // Timestamp when the workspace was launched (RFC3339 format)
 	AppCount  int    `json:"app_count"`  // Total number of applications launched during this session
@@ -19,4 +23,16 @@ type WspRuntime struct {
 // TODO: initialize wsp runtime
 func NewWspRuntime() (*WspRuntime, error) {
 	return &WspRuntime{}, nil
+}
+
+func (wspRt *WspRuntime) Update() error {
+	return nil
+}
+
+func (wspRt *WspRuntime) Monitor() error {
+	return nil
+}
+
+func (wspRt *WspRuntime) Save() error {
+	return nil
 }

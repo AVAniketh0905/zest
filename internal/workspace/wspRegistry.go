@@ -54,6 +54,12 @@ func (wr *WspRegistry) Save() error {
 	return os.WriteFile(wr.path, data, 0644)
 }
 
+// GetCfg return a pointer to `WspConfig` struct for the workspace name.
+func (wr *WspRegistry) GetCfg(name string) (*WspConfig, bool) {
+	cfg, ok := wr.Workspaces[name]
+	return &cfg, ok
+}
+
 // GetPath returns the config path for a workspace name.
 func (wr *WspRegistry) GetPath(name string) (string, bool) {
 	cfg, ok := wr.Workspaces[name]

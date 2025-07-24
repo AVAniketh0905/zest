@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -25,24 +26,31 @@ var (
 	ErrWorkspaceNotExists   utils.ZestErr = errors.New("workspace does not exist")
 )
 
-// WspConfig represents the user-defined configuration for a single workspace.
-// This is stored as a YAML file under ~/.zest/workspace/<name>.yaml
+// WspConfig defines the user-provided configuration for a workspace.
+// This is stored as a YAML file at ~/.zest/workspaces/<name>.yaml
 type WspConfig struct {
-	Name   string `json:"name" yaml:"name"`
-	Path   string `json:"path" yaml:"path"`
-	Status Status `json:"status" yaml:"status"`
+	Name   string `json:"name" yaml:"name"`     // Name of the workspace
+	Path   string `json:"path" yaml:"path"`     // Absolute path to the editable workspace config file
+	Status Status `json:"status" yaml:"status"` // Current status of the workspace (e.g., Active, Inactive)
 
-	WorkspaceDir string `json:"workspace_dir" yaml:"workspace_dir"`
+	WorkspaceDir string `json:"workspace_dir" yaml:"workspace_dir"` // Root directory where all commands will be executed
 
-	Template string `json:"template,omitempty" yaml:"template,omitempty"`
+	Template string `json:"template,omitempty" yaml:"template,omitempty"` // Optional template name this workspace is based on
 
-	Created  string `json:"created" yaml:"created"`
-	LastUsed string `json:"last_used" yaml:"last_used"`
+	Created     string `json:"created" yaml:"created"`           // Timestamp of when the config file was created (RFC3339 format)
+	LastUpdated string `json:"last_updated" yaml:"last_updated"` // Timestamp of the last modification to the config file
+	LastUsed    string `json:"last_used" yaml:"last_used"`       // Timestamp of the most recent launch via `zest launch`
 }
 
 // returns true if workspace with the given name already exists
 func checkName(name string) error {
 	if strings.TrimSpace(name) == "" {
+		return ErrInvalidWorkspaceName
+	}
+
+	// allows alphanumeric names for workspaces
+	reg := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+	if !reg.MatchString(name) {
 		return ErrInvalidWorkspaceName
 	}
 
@@ -74,6 +82,7 @@ func Init(name, template string) error {
 		Path:     filepath.Join(utils.ZestWspDir(), name+".yaml"),
 		LastUsed: "never",
 	}
+	cfg.LastUpdated = cfg.Created
 
 	// TODO: for now writing only path to yaml file
 	data, err := yaml.Marshal(cfg)

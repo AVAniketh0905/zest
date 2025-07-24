@@ -23,8 +23,14 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"strings"
+	"sync"
+	"text/tabwriter"
 
+	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // statusCmd represents the status command
@@ -41,8 +47,17 @@ If no workspace name is provided, the status of all open workspaces will be show
  zest status personal
  zest status personal --verbose
  zest status --json`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintln(cmd.OutOrStdout(), "status called")
+	Args: cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := cmd.ValidateArgs(args); err != nil {
+			return err
+		}
+
+		if err := workspaceStatuses(cmd.OutOrStdout(), args); err != nil {
+			return err
+		}
+
+		return nil
 	},
 }
 
@@ -56,4 +71,105 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func workspaceStatuses(w io.Writer, wsps []string) error {
+	// log.Println("[zest] status: initializing workspace registry")
+
+	wspReg, err := workspace.NewWspRegistry()
+	if err != nil {
+		return err
+	}
+
+	activeCh := make(chan *workspace.WspRuntime)
+	inactiveCh := make(chan *workspace.WspConfig)
+
+	wg := sync.WaitGroup{}
+
+	// Writer goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// log.Println("[zest] status: starting writer goroutine")
+
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		defer func() {
+			// log.Println("[zest] status: flushing tabwriter")
+			tw.Flush()
+		}()
+
+		// Inactive section
+		fmt.Fprintln(tw, workspace.Inactive)
+		fmt.Fprintln(tw, "NAME\tSTATUS\tLAST_USED\tPATH")
+
+		for inactive := range inactiveCh {
+			// log.Printf("[zest] status: received inactive workspace: %s", inactive.Name)
+			fmt.Fprintf(tw, "%s\tInactive\t%s\t%s\n",
+				inactive.Name, inactive.LastUsed, inactive.Path)
+		}
+
+		// Active section
+		fmt.Fprintln(tw, workspace.Active)
+		fmt.Fprintln(tw, "NAME\tSTATUS\tSTARTED_AT\tPIDS")
+
+		for active := range activeCh {
+			// log.Printf("[zest] status: received active workspace: %s", active.Name)
+			fmt.Fprintf(tw, "%s\tActive\t%s\t%s\n",
+				active.Name, active.StartedAt, strings.Join(active.Processes, ","))
+		}
+
+		// log.Println("[zest] status: writer goroutine finished")
+	}()
+
+	// errgroup for writing to active and inactive channels
+	var g errgroup.Group
+
+	// Launch one goroutine per workspace
+	for _, wsp := range wsps {
+		g.Go(func() error {
+			// log.Printf("[zest] status: checking workspace: %s", wsp)
+			return wspStatus(wspReg, wsp, inactiveCh, activeCh)
+		})
+	}
+
+	// Wait for all workers and the writer
+	if err := g.Wait(); err != nil {
+		// log.Printf("[zest] status: error encountered: %v", err)
+		close(activeCh)
+		close(inactiveCh)
+		return err
+	}
+
+	// Close channels
+	// log.Println("[zest] status: all workspace goroutines finished, closing channels")
+	close(activeCh)
+	close(inactiveCh)
+
+	wg.Wait()
+
+	// log.Println("[zest] status: completed successfully")
+	return nil
+}
+
+func wspStatus(wspReg *workspace.WspRegistry, wsp string, inactiveCh chan<- *workspace.WspConfig, activeCh chan<- *workspace.WspRuntime) error {
+	cfg, ok := wspReg.GetCfg(wsp)
+	if !ok || cfg == nil {
+		return fmt.Errorf("workspace %q not found or not initialized", wsp)
+	}
+
+	if cfg.Status == workspace.Inactive {
+		// log.Printf("[zest] status: workspace %q is inactive", wsp)
+		inactiveCh <- cfg
+		return nil
+	}
+
+	// log.Printf("[zest] status: workspace %q is active, loading runtime", wsp)
+	wspRt, err := workspace.NewWspRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to load runtime for %q: %v", wsp, err)
+	}
+
+	// log.Printf("[zest] status: sending runtime for %q to channel", wsp)
+	activeCh <- wspRt
+	return nil
 }

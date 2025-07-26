@@ -56,6 +56,7 @@ func addCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(launchCmd)
 }
 
 func NewRootCmd() *cobra.Command {

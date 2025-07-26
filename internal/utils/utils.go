@@ -27,12 +27,16 @@ func ZestStateDir() string {
 	return filepath.Join(ZestDir(), "state")
 }
 
+func ZestRuntimeWspDir() string {
+	return filepath.Join(ZestStateDir(), "workspaces")
+}
+
 func EnsureZestDirs() error {
 	dirs := []string{
 		ZestDir(),
 		ZestWspDir(),
 		ZestStateDir(),
-		filepath.Join(ZestStateDir(), "workspaces"),
+		ZestRuntimeWspDir(),
 	}
 
 	for _, dir := range dirs {

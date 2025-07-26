@@ -45,7 +45,9 @@ If no workspace name is provided, the status of all open workspaces will be show
 	Example: ` zest status
  zest status personal
  zest status personal --verbose
- zest status --json`,
+ zest status --json
+ zest status --since 1h
+ zest status --watch`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cmd.ValidateArgs(args); err != nil {
@@ -64,8 +66,8 @@ If no workspace name is provided, the status of all open workspaces will be show
 			return err
 		}
 
-		inactiveCh := make(chan *workspace.WspConfig)
-		activeCh := make(chan *workspace.WspRuntime)
+		inactiveCh := make(chan *workspace.WspConfig, 3) // BUG: deadlock if not buffere
+		activeCh := make(chan *workspace.WspRuntime, 3)
 
 		wg := sync.WaitGroup{}
 		tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
@@ -81,7 +83,7 @@ If no workspace name is provided, the status of all open workspaces will be show
 
 		// Writer goroutine
 		wg.Add(1)
-		go writerFunc(&wg, tw, inactiveCh, activeCh, skipped)
+		go writerFunc(&wg, tw, inactiveCh, activeCh)
 
 		// goroutine for populating active and inactive channels
 		var g errgroup.Group
@@ -119,9 +121,10 @@ func init() {
 	// and all subcommands, e.g.:
 	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	statusCmd.Flags().Bool("json", false, "Output in JSON format")
+	statusCmd.Flags().BoolP("verbose", "v", false, "Show full runtime details")
+	statusCmd.Flags().String("since", "", "Show only workspaces active since a given time")
+	statusCmd.Flags().Bool("watch", false, "Watch live status with periodic updates")
 }
 
 func filterArgs(original, args []string) ([]string, string, error) {
@@ -141,6 +144,10 @@ func filterArgs(original, args []string) ([]string, string, error) {
 		}
 	}
 
+	if skipped == "Skipped " {
+		skipped += "None"
+	}
+
 	if len(filter) != 0 {
 		return filter, skipped, nil
 	}
@@ -148,7 +155,7 @@ func filterArgs(original, args []string) ([]string, string, error) {
 	return original, "Skipped *", nil
 }
 
-func writerFunc(wg *sync.WaitGroup, tw *tabwriter.Writer, inactiveCh <-chan *workspace.WspConfig, activeCh <-chan *workspace.WspRuntime, skipped string) {
+func writerFunc(wg *sync.WaitGroup, tw *tabwriter.Writer, inactiveCh <-chan *workspace.WspConfig, activeCh <-chan *workspace.WspRuntime) {
 	defer wg.Done()
 	// log.Println("[zest] status: starting writer goroutine")
 
@@ -188,8 +195,11 @@ func getWspData(wspReg *workspace.WspRegistry, wsp string, inactiveCh chan<- *wo
 	}
 
 	// log.Printf("[zest] status: workspace %q is active, loading runtime", wsp)
-	wspRt, err := workspace.NewWspRuntime()
+	wspRt, err := workspace.NewWspRuntime(wsp)
 	if err != nil {
+		return err
+	}
+	if err := wspRt.Load(); err != nil {
 		return fmt.Errorf("failed to load runtime for %q: %v", wsp, err)
 	}
 

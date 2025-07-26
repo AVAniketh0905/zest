@@ -10,12 +10,11 @@ import (
 )
 
 // WspRegistry maintains a global map of all known workspaces.
-// It maps workspace names to their corresponding config file paths.
 // This is stored in ~/.zest/state/workspace.json
 type WspRegistry struct {
 	path string
 
-	Workspaces map[string]WspConfig `json:"workspaces"` // key = workspace name, value = path to its config YAML file
+	Workspaces map[string]*WspConfig `json:"workspaces"` // key = workspace name, value = path to its config YAML file
 }
 
 // NewWspRegistry loads the registry from disk or initializes an empty one.
@@ -24,7 +23,7 @@ func NewWspRegistry() (*WspRegistry, error) {
 
 	reg := &WspRegistry{
 		path:       regPath,
-		Workspaces: map[string]WspConfig{},
+		Workspaces: map[string]*WspConfig{},
 	}
 
 	// Try to read from disk if exists
@@ -39,7 +38,7 @@ func NewWspRegistry() (*WspRegistry, error) {
 
 // Update adds or updates a workspace in the registry.
 func (wr *WspRegistry) Update(cfg *WspConfig) {
-	wr.Workspaces[cfg.Name] = *cfg
+	wr.Workspaces[cfg.Name] = cfg
 }
 
 // Save writes the current state of the registry to disk.
@@ -57,7 +56,7 @@ func (wr *WspRegistry) Save() error {
 // GetCfg return a pointer to `WspConfig` struct for the workspace name.
 func (wr *WspRegistry) GetCfg(name string) (*WspConfig, bool) {
 	cfg, ok := wr.Workspaces[name]
-	return &cfg, ok
+	return cfg, ok
 }
 
 // GetPath returns the config path for a workspace name.

@@ -43,7 +43,9 @@ about each known workspace, such as its name, current status (open or closed),
 last used timestamp, and configuration file path.`,
 	Example: ` zest list
  zest list --json
- zest list --filter open`,
+ zest list --filter open
+ zest list --sort last_used
+ zest list --quiet`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return listWorkspaces(cmd.OutOrStdout())
 	},
@@ -56,9 +58,10 @@ func init() {
 	// and all subcommands, e.g.:
 	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	listCmd.Flags().Bool("json", false, "Output in JSON format")
+	listCmd.Flags().String("filter", "all", "Filter by status: open, closed, all")
+	listCmd.Flags().String("sort", "name", "Sort by: name, last_used, status")
+	listCmd.Flags().BoolP("quiet", "q", false, "Only print workspace names")
 }
 
 func listWorkspaces(w io.Writer) error {

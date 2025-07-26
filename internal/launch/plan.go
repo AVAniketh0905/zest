@@ -74,6 +74,12 @@ func (ls *Plan) parse(data []byte) error {
 
 // TODO: launches goroutines to start executing apps
 func (ls *Plan) Start() error {
+	for _, app := range ls.Apps {
+		err := app.Start()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

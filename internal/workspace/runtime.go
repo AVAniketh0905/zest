@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	ErrWorkspaceIsActive utils.ZestErr = errors.New("workspace already active")
+	ErrWorkspaceIsActive   utils.ZestErr = errors.New("workspace already active")
+	ErrWorkspaceIsInactive utils.ZestErr = errors.New("workspace is inactive")
 )
 
 // WspRuntime captures the live state of a running workspace session.
@@ -80,4 +81,11 @@ func (wspRt *WspRuntime) Save() error {
 	defer wspRt.Unlock()
 
 	return os.WriteFile(wspRt.RtFile, data, 0644)
+}
+
+func (wspRt *WspRuntime) Delete() error {
+	wspRt.Lock()
+	defer wspRt.Unlock()
+
+	return os.Remove(wspRt.RtFile)
 }

@@ -22,30 +22,29 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/AVAniketh0905/zest/internal/launch"
+	"os"
+	"time"
+
 	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
-// launchCmd represents the launch command
-var launchCmd = &cobra.Command{
-	Use:   "launch [workspace-name]",
-	Short: "Launch a workspace",
-	Long: `Launches the specified workspace, initializing its runtime state and executing
-its startup command.
-`,
+// TODO: closeCmd represents the close command
+var closeCmd = &cobra.Command{
+	Use:   "close",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	Args: cobra.ExactArgs(1),
-	Example: `  zest launch work
-  zest launch work --detach
-  zest launch personal --dry-run
-  zest launch work --env MODE=dev
-  zest launch work --force
-  zest launch personal --dry-run --env MODE=test --cmd "./custom-start.sh"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cmd.ValidateArgs(args); err != nil {
 			return err
 		}
-		return launchWorkspace(args[0])
+		return closeWorkspace(args[0])
 	},
 }
 
@@ -54,16 +53,15 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// launchCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// closeCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	launchCmd.Flags().Bool("dry-run", false, "Validate config and simulate launch without executing")
-	launchCmd.Flags().BoolP("detach", "d", false, "Run workspace in background")
-	launchCmd.Flags().StringToString("env", nil, "Set or override environment variables (e.g. --env KEY=VALUE)")
-	launchCmd.Flags().BoolP("force", "f", false, "Force launch even if workspace is active")
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// closeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func launchWorkspace(wspName string) error {
-	// log.Printf("[zest] starting launch sequence for workspace: %s", wspName)
+func closeWorkspace(wspName string) error {
+	// log.Printf("[zest] closing sequence for workspace: %s", wspName)
 
 	wspReg, err := workspace.NewWspRegistry()
 	if err != nil {
@@ -78,18 +76,10 @@ func launchWorkspace(wspName string) error {
 		return workspace.ErrWorkspaceNotExists
 	}
 
-	if wspCfg.Status == workspace.Active {
-		// log.Printf("[zest] workspace '%s' is already active", wspName)
-		return workspace.ErrWorkspaceIsActive
+	if wspCfg.Status == workspace.Inactive {
+		// log.Printf("[zest] workspace '%s' is inactive", wspName)
+		return workspace.ErrWorkspaceIsInactive
 	}
-	// log.Printf("[zest] workspace '%s' is valid and inactive", wspName)
-
-	plan, err := launch.NewLaunchPlan(wspName)
-	if err != nil {
-		// log.Printf("[zest] failed to parse launch plan: %v", err)
-		return err
-	}
-	// log.Printf("[zest] parsed launch plan for workspace '%s'", wspName)
 
 	wspRt, err := workspace.NewWspRuntime(wspCfg.Name)
 	if err != nil {
@@ -98,29 +88,36 @@ func launchWorkspace(wspName string) error {
 	}
 	// log.Printf("[zest] initialized workspace runtime")
 
-	if err := plan.Start(); err != nil {
-		// log.Printf("[zest] failed to launch apps: %v", err)
+	// TODO: kill all process in this workspace
+	// BUG: not closing process
+	for _, pid := range wspRt.PIDs {
+		if err := killProcess(pid); err != nil {
+			// log.Printf("[zest] failed to kill process, %d, %v", pid, err)
+			return err
+		}
+	}
+
+	if err := wspRt.Delete(); err != nil {
+		// log.Printf("[zest] failed to delete process, %v", err)
 		return err
 	}
-	// log.Printf("[zest] launched apps successfully")
 
-	wspRt.Update(plan)
-	// log.Printf("[zest] updated workspace runtime state")
-
-	if err := wspRt.Save(); err != nil {
-		// log.Printf("[zest] failed to save workspace runtime state: %v", err)
-		return err
-	}
-	// log.Printf("[zest] saved workspace runtime state")
-
-	wspCfg.Status = workspace.Active
+	wspCfg.Status = workspace.Inactive
+	wspCfg.LastUsed = time.Now().Format(time.RFC3339)
 	wspReg.Update(wspCfg)
 	if err := wspReg.Save(); err != nil {
 		// log.Printf("[zest] failed to update workspace status in registry: %v", err)
 		return err
 	}
-	// log.Printf("[zest] workspace '%s' marked as active and registry saved", wspName)
 
-	// log.Printf("[zest] workspace launch completed successfully for '%s'", wspName)
 	return nil
+}
+
+func killProcess(pid int) error {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+
+	return process.Kill()
 }

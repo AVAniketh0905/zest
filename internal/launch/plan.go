@@ -75,8 +75,7 @@ func (ls *Plan) parse(data []byte) error {
 // TODO: launches goroutines to start executing apps
 func (ls *Plan) Start() error {
 	for _, app := range ls.Apps {
-		err := app.Start()
-		if err != nil {
+		if err := app.Start(); err != nil {
 			return err
 		}
 	}
@@ -97,8 +96,4 @@ func (ls *Plan) GetPIDs() []int {
 		pids = append(pids, app.GetPID())
 	}
 	return pids
-}
-
-func (ls *Plan) Close() error {
-	return nil
 }

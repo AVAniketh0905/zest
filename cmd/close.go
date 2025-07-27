@@ -31,14 +31,12 @@ import (
 
 // TODO: closeCmd represents the close command
 var closeCmd = &cobra.Command{
-	Use:   "close",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "close [workspace-name]",
+	Short: "Close an existing or active workspace",
+	Long:  `Close a specific workspace by name, or use --all to close all workspaces.`,
+	Example: `  zest close work
+  zest close --all                
+  zest close work --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cmd.ValidateArgs(args); err != nil {
@@ -55,9 +53,8 @@ func init() {
 	// and all subcommands, e.g.:
 	// closeCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// closeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	closeCmd.Flags().BoolP("force", "f", false, "Force close the workspace even if it's active or has unsaved changes")
+	closeCmd.Flags().Bool("all", false, "Close all currently open workspaces")
 }
 
 func closeWorkspace(wspName string) error {

@@ -48,8 +48,8 @@ func TestListCommand_ShowsExpectedWorkspaces(t *testing.T) {
 	testCases := []struct {
 		args []string
 	}{
-		{args: []string{"init", "-n", "work"}},
-		{args: []string{"init", "-n", "personal"}},
+		{args: []string{"init", "work"}},
+		{args: []string{"init", "personal"}},
 		{args: []string{"list"}},
 	}
 

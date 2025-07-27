@@ -2,63 +2,91 @@ package test
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/AVAniketh0905/zest/cmd"
+	"github.com/AVAniketh0905/zest/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTempDir() (string, func()) {
 	tempDir, _ := os.MkdirTemp("", "zest-test-*")
 	return tempDir, func() {
-		os.RemoveAll(filepath.Join(tempDir, ".zest"))
+		_ = os.RemoveAll(filepath.Join(tempDir, ".zest"))
 	}
 }
 
-func TestInitCmd(t *testing.T) {
+func TestInitCommand_CreatesWorkspaceSuccessfully(t *testing.T) {
 	tempDir, cleanup := setupTempDir()
 	defer cleanup()
 
-	testCases := []struct {
-		args     []string
-		fail     bool
-		expected string
-	}{
-		{args: []string{"init", "personal"}, fail: true, expected: "Error: required flag(s) \"name\" not set\n"},
-		{args: []string{"init"}, fail: true, expected: "Error: required flag(s) \"name\" not set\n"},
-		{args: []string{"init", "-n", "work"}, fail: false, expected: "Initialized the workspace, work\n"},
-		{args: []string{"init", "--name", "personal"}, fail: false, expected: "Initialized the workspace, personal\n"},
-		{args: []string{"init", "-n", "work"}, fail: true, expected: "Error: workspace already exists\n"},
-		{args: []string{"init", "-n", ""}, fail: true, expected: "Error: invalid workspace name\n"},
-	}
+	cmd := cmd.NewRootCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"init", "work", "--custom", tempDir})
 
-	for _, tc := range testCases {
-		rootCmd := cmd.NewRootCmd()
-		buf := new(bytes.Buffer)
-		errbuf := new(bytes.Buffer)
+	err := cmd.Execute()
+	require.NoError(t, err)
+	require.Equal(t, "Initialized the workspace, work\n", buf.String())
 
-		tc.args = append(tc.args, "--custom", tempDir)
+	// Assert workspace file created
+	wspFile := filepath.Join(utils.ZestWspDir(), "work.yaml")
+	_, err = os.Stat(wspFile)
+	require.NoError(t, err)
+}
 
-		rootCmd.SetOut(buf)
-		rootCmd.SetErr(errbuf)
-		rootCmd.SetArgs(tc.args)
-		rootCmd.Execute()
+func TestInitCommand_RejectsMissingNameFlag(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
 
-		if tc.fail {
-			out := errbuf.String()
-			if out != tc.expected {
-				t.Log(tc.args)
-				t.Logf("buf: %v\n\n, errbuf: %v\n\n", buf.String(), errbuf.String())
-				t.Errorf("incorrect output: expected %q, got %q\n", tc.expected, out)
-			}
-		} else {
-			out := buf.String()
-			if out != tc.expected {
-				t.Log(tc.args)
-				t.Logf("buf: %v\n\n, errbuf: %v\n\n", buf.String(), errbuf.String())
-				t.Errorf("incorrect output: expected %q, got %q\n", tc.expected, out)
-			}
-		}
-	}
+	cmd := cmd.NewRootCmd()
+	var errBuf bytes.Buffer
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"init", "--custom", tempDir})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, errBuf.String(), `Error: requires at least 1 arg(s), only received 0`)
+}
+
+func TestInitCommand_RejectsEmptyWorkspaceName(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
+
+	cmd := cmd.NewRootCmd()
+	var errBuf bytes.Buffer
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"init", "", "--custom", tempDir})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, errBuf.String(), "Error: invalid workspace name\n")
+}
+
+func TestInitCommand_RejectsDuplicateWorkspace(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
+
+	// First creation
+	cmd := cmd.NewRootCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir})
+	require.NoError(t, cmd.Execute())
+
+	// Second creation
+	var errBuf bytes.Buffer
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, errBuf.String(), "workspace already exists")
 }

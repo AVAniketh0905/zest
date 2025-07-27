@@ -28,13 +28,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	name string
-)
-
 // initCmd represents the init command
 var initCmd = &cobra.Command{
-	Use:   "init",
+	Use:   "init [workspace-name]",
 	Short: "Initialize a new workspace",
 	Long: `The init command creates a new workspace with the given name, setting up the
 necessary directory structure and optional template files.
@@ -42,16 +38,23 @@ necessary directory structure and optional template files.
 Workspaces are isolated environments used for organizing different contexts like
 work, personal, or learning projects.
 `,
-	Example: `  zest init --name works 
-  zest init -n personal --template journal
+	Example: `  zest init work 
+  zest init personal
 `,
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := workspace.Init(name, "") // TODO: template
+		if err := cmd.ValidateArgs(args); err != nil {
+			return err
+		}
+		wspName := args[0] // TODO: multiple workspaces
+		// log.Printf("wspname: %q\n", wspName)
+
+		err := workspace.Init(wspName, "") // TODO: template
 		if err != nil {
 			return err
 		}
 
-		_, err = fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", name)
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", wspName)
 		return err
 	},
 }
@@ -62,9 +65,4 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	initCmd.Flags().StringVarP(&name, "name", "n", "", "name of the workspace (required)")
-	cobra.CheckErr(initCmd.MarkFlagRequired("name"))
 }

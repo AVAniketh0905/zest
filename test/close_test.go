@@ -1,0 +1,85 @@
+package test
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/AVAniketh0905/zest/cmd"
+	"github.com/AVAniketh0905/zest/internal/utils"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCloseCommand_RejectsInactiveWorkspace(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
+
+	// Init workspace (remains inactive)
+	rootCmd := cmd.NewRootCmd()
+	rootCmd.SetArgs([]string{"init", "inactive", "--custom", tempDir})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	require.NoError(t, rootCmd.Execute())
+
+	// Attempt to close it
+	rootCmd.SetArgs([]string{"close", "inactive", "--custom", tempDir})
+	rootCmd.SetOut(io.Discard)
+
+	var errBuf bytes.Buffer
+	rootCmd.SetErr(&errBuf)
+
+	err := rootCmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "workspace is inactive")
+}
+
+func TestCloseCommand_ClosesActiveWorkspace(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
+
+	// 1. Init workspace
+	rootCmd := cmd.NewRootCmd()
+	rootCmd.SetArgs([]string{"init", "alpha", "--custom", tempDir})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	require.NoError(t, rootCmd.Execute())
+
+	// 2. Launch workspace
+	rootCmd.SetArgs([]string{"launch", "alpha", "--custom", tempDir})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	require.NoError(t, rootCmd.Execute())
+
+	// 3. Close workspace
+	rootCmd.SetArgs([]string{"close", "alpha", "--custom", tempDir})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	require.NoError(t, rootCmd.Execute())
+
+	// 4. Assert runtime file is deleted
+	rtFile := filepath.Join(utils.ZestRuntimeWspDir(), "alpha.json")
+	_, err := os.Stat(rtFile)
+	require.Error(t, err, "expected runtime file to be deleted")
+	require.True(t, os.IsNotExist(err))
+
+	// 5. Assert workspace.json status is now inactive
+	wsStateFile := filepath.Join(utils.ZestStateDir(), "workspaces.json")
+	data, err := os.ReadFile(wsStateFile)
+	require.NoError(t, err)
+
+	var wspState struct {
+		Workspaces map[string]struct {
+			Status   string `json:"status"`
+			LastUsed string `json:"last_used"`
+		} `json:"workspaces"`
+	}
+	require.NoError(t, json.Unmarshal(data, &wspState))
+
+	wsp := wspState.Workspaces["alpha"]
+	require.Equal(t, "inactive", strings.ToLower(wsp.Status))
+	require.NotEqual(t, "never", wsp.LastUsed)
+}

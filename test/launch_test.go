@@ -18,7 +18,7 @@ func TestLaunchCommand_LaunchesInactiveWorkspace(t *testing.T) {
 
 	// Init workspace
 	cmd := cmd.NewRootCmd()
-	cmd.SetArgs([]string{"init", "-n", "dev", "--custom", tempDir})
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())
@@ -63,7 +63,7 @@ func TestLaunchCommand_RejectsAlreadyActiveWorkspace(t *testing.T) {
 
 	// Init
 	cmd := cmd.NewRootCmd()
-	cmd.SetArgs([]string{"init", "-n", "dev", "--custom", tempDir})
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())
@@ -92,7 +92,7 @@ func TestLaunchCommand_CreatesRuntimeFile(t *testing.T) {
 
 	// Init workspace
 	cmd := cmd.NewRootCmd()
-	cmd.SetArgs([]string{"init", "-n", "dev", "--custom", tempDir})
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())

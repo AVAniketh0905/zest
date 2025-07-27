@@ -71,8 +71,8 @@ func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 
 	// Set up two inactive workspaces
 	initCmds := [][]string{
-		{"init", "-n", "inactive1"},
-		{"init", "-n", "inactive2"},
+		{"init", "inactive1"},
+		{"init", "inactive2"},
 	}
 
 	for _, args := range initCmds {
@@ -117,7 +117,7 @@ func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 	// Setup: create two workspaces
 	for _, wsp := range []string{"work", "personal"} {
 		cmd := cmd.NewRootCmd()
-		cmd.SetArgs([]string{"init", "-n", wsp, "--custom", tempDir})
+		cmd.SetArgs([]string{"init", wsp, "--custom", tempDir})
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
 		require.NoError(t, cmd.Execute())
@@ -152,7 +152,7 @@ func TestStatusCommand_SkippedInvalidWorkspaces(t *testing.T) {
 
 	// Create actual workspace so we can detect skipped
 	cmd := cmd.NewRootCmd()
-	cmd.SetArgs([]string{"init", "-n", "work", "--custom", tempDir})
+	cmd.SetArgs([]string{"init", "work", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())
@@ -176,7 +176,7 @@ func TestStatusCommand_SomeSkippedSomeValid(t *testing.T) {
 
 	// Create "personal" workspace
 	cmd := cmd.NewRootCmd()
-	cmd.SetArgs([]string{"init", "-n", "personal", "--custom", tempDir})
+	cmd.SetArgs([]string{"init", "personal", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())

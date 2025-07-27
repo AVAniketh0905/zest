@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: closeCmd represents the close command
+// closeCmd represents the close command
 var closeCmd = &cobra.Command{
 	Use:   "close [workspace-name]",
 	Short: "Close an existing or active workspace",

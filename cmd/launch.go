@@ -104,6 +104,12 @@ func launchWorkspace(wspName string) error {
 	}
 	// log.Printf("[zest] launched apps successfully")
 
+	// set process pids before launch of the app
+	wspRt.ProcessPIDs, err = plan.GetProcessPIDs()
+	if err != nil {
+		return err
+	}
+
 	wspRt.Update(plan)
 	// log.Printf("[zest] updated workspace runtime state")
 

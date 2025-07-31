@@ -27,8 +27,9 @@ type WspRuntime struct {
 	StartedAt string `json:"started_at"` // Timestamp when the workspace was launched (RFC3339 format)
 	AppCount  int    `json:"app_count"`  // Total number of applications launched during this session
 
-	PIDs      []int    `json:"pids"`      // List of process IDs associated with the workspace
-	Processes []string `json:"processes"` // Commands or app names launched as part of this workspace
+	PIDs        []int            `json:"pids"`         // List of process IDs associated with the workspace
+	Processes   []string         `json:"processes"`    // Commands or app names launched as part of this workspace
+	ProcessPIDs map[string][]int `json:"process_pids"` // PIDs of processes before starting the app
 
 	Ports       []int    `json:"ports,omitempty"`        // Ports opened by services within the workspace
 	BrowserURLs []string `json:"browser_urls,omitempty"` // Web URLs opened by this workspace (if any)
@@ -65,7 +66,7 @@ func (wspRt *WspRuntime) Update(plan *launch.Plan) {
 	wspRt.StartedAt = time.Now().Format(time.RFC3339)
 	wspRt.AppCount = len(plan.Apps)
 	wspRt.PIDs = plan.GetPIDs()
-	wspRt.Processes = plan.GetProcesNames()
+	wspRt.Processes = plan.GetProcessNames()
 }
 
 func (wspRt *WspRuntime) Save() error {

@@ -9,6 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type AppSpec interface {
+	GetName() string
+	GetPID() int
+	Start() error
+}
+
 type Plan struct {
 	Name       string
 	WorkingDir string
@@ -82,7 +88,7 @@ func (ls *Plan) Start() error {
 	return nil
 }
 
-func (ls *Plan) GetProcesNames() []string {
+func (ls *Plan) GetProcessNames() []string {
 	names := []string{}
 	for _, app := range ls.Apps {
 		names = append(names, app.GetName())
@@ -96,4 +102,16 @@ func (ls *Plan) GetPIDs() []int {
 		pids = append(pids, app.GetPID())
 	}
 	return pids
+}
+
+func (ls *Plan) GetProcessPIDs() (map[string][]int, error) {
+	ppids := make(map[string][]int)
+	for _, app := range ls.Apps {
+		before, err := utils.ListPIDs(app.GetName())
+		if err != nil {
+			return nil, err
+		}
+		ppids[app.GetName()] = before
+	}
+	return ppids, nil
 }

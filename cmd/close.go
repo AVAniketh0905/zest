@@ -22,9 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"os"
+	"fmt"
 	"time"
 
+	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -83,14 +84,37 @@ func closeWorkspace(wspName string) error {
 		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
 		return err
 	}
+	if err := wspRt.Load(); err != nil {
+		// log.Printf("[zest] failed to load workspace runtime: %v", err)
+		return err
+	}
 	// log.Printf("[zest] initialized workspace runtime")
+
+	beforeMap := wspRt.ProcessPIDs
+	afterMap := make(map[string][]int)
+
+	for _, pname := range wspRt.Processes {
+		pids, err := utils.ListPIDs(pname)
+		if err != nil {
+			return err
+		}
+		afterMap[pname] = pids
+	}
 
 	// TODO: kill all process in this workspace
 	// BUG: not closing process
-	for _, pid := range wspRt.PIDs {
-		if err := killProcess(pid); err != nil {
-			// log.Printf("[zest] failed to kill process, %d, %v", pid, err)
-			return err
+	for _, pname := range wspRt.Processes {
+		bef, okb := beforeMap[pname]
+		after, oka := afterMap[pname]
+		if !okb || !oka {
+			return fmt.Errorf("failed to find the process with the name, %v", pname)
+		}
+
+		newPids := utils.Diff(after, bef)
+		for _, newPid := range newPids {
+			if err := utils.Kill(newPid); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -108,13 +132,4 @@ func closeWorkspace(wspName string) error {
 	}
 
 	return nil
-}
-
-func killProcess(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return err
-	}
-
-	return process.Kill()
 }

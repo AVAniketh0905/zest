@@ -1,12 +1,13 @@
 package launch
 
 import (
-	"log"
 	"os/exec"
+
+	"github.com/AVAniketh0905/zest/internal/utils"
 )
 
 type CustomApp struct {
-	pid int
+	pids []int
 
 	Name string   `yaml:"name"`
 	Cmd  string   `yaml:"cmd"`
@@ -14,13 +15,18 @@ type CustomApp struct {
 }
 
 func (c *CustomApp) GetName() string { return c.Name }
-func (c *CustomApp) GetPID() int     { return c.pid }
+func (c *CustomApp) GetPIDs() []int  { return c.pids }
 func (c *CustomApp) Start() error {
-	log.Println("cmd and stuff: ", c.Cmd, c.Args)
+	bef, err := utils.ListPIDs(c.Name)
+	if err != nil {
+		return err
+	}
+
 	cmd := exec.Command(c.Cmd, c.Args...)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	c.pid = cmd.Process.Pid
+
+	c.pids = bef // all process with its name
 	return nil
 }

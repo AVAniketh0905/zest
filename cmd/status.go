@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -178,7 +177,7 @@ func writerFunc(wg *sync.WaitGroup, tw *tabwriter.Writer, inactiveCh <-chan *wor
 		// log.Printf("[zest] status: received active workspace: %s", active.Name)
 		pidStrSlice := []string{}
 		for _, pid := range active.PIDs {
-			pidStrSlice = append(pidStrSlice, strconv.Itoa(pid))
+			pidStrSlice = append(pidStrSlice, fmt.Sprint(pid))
 		}
 		fmt.Fprintf(tw, "%s\tActive\t%s\t%s\n",
 			active.Name, active.StartedAt, strings.Join(pidStrSlice, ","))

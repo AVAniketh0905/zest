@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
@@ -90,27 +89,11 @@ func closeWorkspace(wspName string) error {
 	}
 	// log.Printf("[zest] initialized workspace runtime")
 
-	beforeMap := wspRt.ProcessPIDs
-	afterMap := make(map[string][]int)
+	// kill all processes
+	for i, pids := range wspRt.PIDs {
+		after, _ := utils.ListPIDs(wspRt.Processes[i])
 
-	for _, pname := range wspRt.Processes {
-		pids, err := utils.ListPIDs(pname)
-		if err != nil {
-			return err
-		}
-		afterMap[pname] = pids
-	}
-
-	// TODO: kill all process in this workspace
-	// BUG: not closing process
-	for _, pname := range wspRt.Processes {
-		bef, okb := beforeMap[pname]
-		after, oka := afterMap[pname]
-		if !okb || !oka {
-			return fmt.Errorf("failed to find the process with the name, %v", pname)
-		}
-
-		newPids := utils.Diff(after, bef)
+		newPids := utils.Diff(after, pids)
 		for _, newPid := range newPids {
 			if err := utils.Kill(newPid); err != nil {
 				return err

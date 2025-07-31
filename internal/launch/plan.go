@@ -11,7 +11,7 @@ import (
 
 type AppSpec interface {
 	GetName() string
-	GetPID() int
+	GetPIDs() []int
 	Start() error
 }
 
@@ -96,22 +96,10 @@ func (ls *Plan) GetProcessNames() []string {
 	return names
 }
 
-func (ls *Plan) GetPIDs() []int {
-	pids := []int{}
+func (ls *Plan) GetPIDs() [][]int {
+	pids := [][]int{}
 	for _, app := range ls.Apps {
-		pids = append(pids, app.GetPID())
+		pids = append(pids, app.GetPIDs())
 	}
 	return pids
-}
-
-func (ls *Plan) GetProcessPIDs() (map[string][]int, error) {
-	ppids := make(map[string][]int)
-	for _, app := range ls.Apps {
-		before, err := utils.ListPIDs(app.GetName())
-		if err != nil {
-			return nil, err
-		}
-		ppids[app.GetName()] = before
-	}
-	return ppids, nil
 }

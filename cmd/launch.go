@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"github.com/AVAniketh0905/zest/internal/launch"
+	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -106,6 +107,15 @@ func launchWorkspace(wspName string) error {
 
 	wspRt.Update(plan)
 	// log.Printf("[zest] updated workspace runtime state")
+
+	// update pids with actual process pids
+	for i, pname := range wspRt.Processes {
+		after, err := utils.ListPIDs(pname)
+		if err != nil {
+			return err
+		}
+		wspRt.PIDs[i] = utils.Diff(after, wspRt.PIDs[i])
+	}
 
 	if err := wspRt.Save(); err != nil {
 		// log.Printf("[zest] failed to save workspace runtime state: %v", err)

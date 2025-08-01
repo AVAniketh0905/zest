@@ -43,7 +43,7 @@ type WspConfig struct {
 }
 
 // returns true if workspace with the given name already exists
-func checkName(name string) error {
+func checkName(name string, force bool) error {
 	if strings.TrimSpace(name) == "" {
 		return ErrInvalidWorkspaceName
 	}
@@ -57,15 +57,15 @@ func checkName(name string) error {
 	file := fmt.Sprintf("%v.yaml", name)
 	wspPath := filepath.Join(utils.ZestWspDir(), file)
 
-	if _, err := os.Stat(wspPath); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(wspPath); errors.Is(err, os.ErrNotExist) || force {
 		return nil
 	}
 
 	return ErrWorkspaceExists
 }
 
-func Init(name, template string) error {
-	if err := checkName(name); err != nil {
+func Init(name, template string, force bool) error {
+	if err := checkName(name, force); err != nil {
 		return err
 	}
 
@@ -84,7 +84,6 @@ func Init(name, template string) error {
 	}
 	cfg.LastUpdated = cfg.Created
 
-	// TODO: for now writing only path to yaml file
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal yaml file, %s", err)

@@ -90,3 +90,24 @@ func TestInitCommand_RejectsDuplicateWorkspace(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, errBuf.String(), "workspace already exists")
 }
+
+func TestInitCommand_ForceCreateExistingWsp(t *testing.T) {
+	tempDir, cleanup := setupTempDir()
+	defer cleanup()
+
+	// First creation
+	cmd := cmd.NewRootCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir})
+	require.NoError(t, cmd.Execute())
+
+	// Second creation
+	var errBuf bytes.Buffer
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir, "--force"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+}

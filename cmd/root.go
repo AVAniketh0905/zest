@@ -70,9 +70,6 @@ interface across platforms.
 You can create and switch between isolated workspaces such as work, personal, or learning.
 Each workspace can be initialized with custom templates for different use cases.`,
 		Version: VERSION,
-		// Uncomment the following line if your bare application
-		// has an action associated with it:
-		// Run: func(cmd *cobra.Command, args []string) { },
 	}
 
 	// Here you will define your flags and configuration settings.

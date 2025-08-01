@@ -28,6 +28,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	template string
+	force    bool
+)
+
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init [workspace-name]",
@@ -37,19 +42,30 @@ necessary directory structure and optional template files.
 
 Workspaces are isolated environments used for organizing different contexts like
 work, personal, or learning projects.
+
+You can optionally specify a template to scaffold the workspace with predefined files.
+Use --force to overwrite existing workspaces if necessary.
 `,
 	Example: `  zest init work 
-  zest init personal
-`,
+  zest init work --template [template-name]
+  zest init work --force
+  zest init personal`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cmd.ValidateArgs(args); err != nil {
 			return err
 		}
 		wspName := args[0] // TODO: multiple workspaces
-		// log.Printf("wspname: %q\n", wspName)
 
-		err := workspace.Init(wspName, "") // TODO: template
+		if force {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Force enabled: existing workspaces will be overwritten.")
+		}
+
+		if template != "" {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Using template: %s\n", template)
+		}
+
+		err := workspace.Init(wspName, template, force) // TODO: template
 		if err != nil {
 			return err
 		}
@@ -60,9 +76,6 @@ work, personal, or learning projects.
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
+	initCmd.Flags().StringVarP(&template, "template", "t", "", "Template to use for workspace scaffolding")
+	initCmd.Flags().BoolVarP(&force, "force", "f", false, "Force initialization even if workspace already exists")
 }

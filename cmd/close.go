@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"log"
 	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
@@ -91,7 +92,9 @@ func closeWorkspace(wspName string) error {
 
 	// kill all processes
 	for i, pids := range wspRt.PIDs {
+		log.Println("old pids for ", wspRt.Processes[i], ", ", pids)
 		after, _ := utils.ListPIDs(wspRt.Processes[i])
+		log.Println("new pids", after)
 
 		newPids := utils.Diff(after, pids)
 		for _, newPid := range newPids {

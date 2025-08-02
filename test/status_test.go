@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/AVAniketh0905/zest/cmd"
+	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,8 +67,7 @@ func parseStatusOutput(output []byte) ([]WorkspaceStatusRow, error) {
 }
 
 func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Set up two inactive workspaces
 	initCmds := [][]string{
@@ -75,8 +75,9 @@ func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 		{"init", "inactive2"},
 	}
 
+	cfg := &utils.ZestConfig{}
 	for _, args := range initCmds {
-		cmd := cmd.NewRootCmd()
+		cmd := cmd.NewRootCmd(cfg)
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
 		args = append(args, "--custom", tempDir)
@@ -85,7 +86,7 @@ func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 	}
 
 	// Run the status command
-	cmd := cmd.NewRootCmd()
+	cmd := cmd.NewRootCmd(cfg)
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(io.Discard)
@@ -111,12 +112,12 @@ func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 }
 
 func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
+	cfg := &utils.ZestConfig{}
 	// Setup: create two workspaces
 	for _, wsp := range []string{"work", "personal"} {
-		cmd := cmd.NewRootCmd()
+		cmd := cmd.NewRootCmd(cfg)
 		cmd.SetArgs([]string{"init", wsp, "--custom", tempDir})
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
@@ -124,7 +125,7 @@ func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 	}
 
 	// Run `status` without args
-	cmd := cmd.NewRootCmd()
+	cmd := cmd.NewRootCmd(cfg)
 	var buf bytes.Buffer
 	cmd.SetArgs([]string{"status", "--custom", tempDir})
 	cmd.SetOut(&buf)
@@ -147,11 +148,11 @@ func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 }
 
 func TestStatusCommand_SkippedInvalidWorkspaces(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Create actual workspace so we can detect skipped
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "work", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
@@ -171,11 +172,11 @@ func TestStatusCommand_SkippedInvalidWorkspaces(t *testing.T) {
 }
 
 func TestStatusCommand_SomeSkippedSomeValid(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Create "personal" workspace
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "personal", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)

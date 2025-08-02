@@ -29,8 +29,8 @@ type rawPlanYAML struct {
 	Apps map[string][]map[string]any `yaml:"apps"` // dynamic decoding
 }
 
-func NewLaunchPlan(wspName string) (*Plan, error) {
-	path := filepath.Join(utils.ZestWspDir(), wspName+".yaml")
+func NewLaunchPlan(cfg *utils.ZestConfig, wspName string) (*Plan, error) {
+	path := filepath.Join(cfg.WspDir(), wspName+".yaml")
 
 	plan := &Plan{}
 	plan.Name = wspName

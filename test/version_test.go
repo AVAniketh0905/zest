@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/AVAniketh0905/zest/cmd"
+	"github.com/AVAniketh0905/zest/internal/utils"
 )
 
 func TestVersion(t *testing.T) {
@@ -19,8 +20,9 @@ func TestVersion(t *testing.T) {
 		{args: []string{"--version"}, fail: false, expected: "zest: Manage multiple workspaces from a unified CLI - version 0.1.0\n"},
 	}
 
+	cfg := &utils.ZestConfig{}
 	for _, tc := range testCases {
-		rootCmd := cmd.NewRootCmd()
+		rootCmd := cmd.NewRootCmd(cfg)
 		buf := new(bytes.Buffer)
 		errbuf := new(bytes.Buffer)
 

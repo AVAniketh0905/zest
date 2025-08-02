@@ -7,45 +7,48 @@ import (
 
 type ZestErr error
 
-var (
-	CustomZestDir string
-)
+type ZestConfig struct {
+	ZestDir string // Root path to zest directory (default is $HOME)
+}
 
-func ZestDir() string {
-	if CustomZestDir != "" {
-		return filepath.Join(CustomZestDir, ".zest")
+// Root zest directory
+func (cfg *ZestConfig) RootDir() string {
+	if cfg.ZestDir != "" {
+		return filepath.Join(cfg.ZestDir, ".zest")
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".zest")
 }
 
-func ZestWspDir() string {
-	return filepath.Join(ZestDir(), "workspaces")
+// Directory containing all workspaces
+func (cfg *ZestConfig) WspDir() string {
+	return filepath.Join(cfg.RootDir(), "workspaces")
 }
 
-func ZestStateDir() string {
-	return filepath.Join(ZestDir(), "state")
+// Directory storing state
+func (cfg *ZestConfig) StateDir() string {
+	return filepath.Join(cfg.RootDir(), "state")
 }
 
-func ZestRuntimeWspDir() string {
-	return filepath.Join(ZestStateDir(), "workspaces")
+// Directory storing runtime info of workspaces
+func (cfg *ZestConfig) RuntimeWspDir() string {
+	return filepath.Join(cfg.StateDir(), "workspaces")
 }
 
-func EnsureZestDirs() error {
+// Ensures all necessary directories exist
+func (cfg *ZestConfig) EnsureDirs() error {
 	dirs := []string{
-		ZestDir(),
-		ZestWspDir(),
-		ZestStateDir(),
-		ZestRuntimeWspDir(),
+		cfg.RootDir(),
+		cfg.WspDir(),
+		cfg.StateDir(),
+		cfg.RuntimeWspDir(),
 	}
 
 	for _, dir := range dirs {
-		// if exists skip
 		if file, err := os.Stat(dir); err == nil && file.IsDir() {
-			// log.Println("dir already exists, ", file.Name())
 			continue
 		}
-		if err := os.Mkdir(dir, os.ModePerm); err != nil {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			return err
 		}
 	}

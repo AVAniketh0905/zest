@@ -51,16 +51,16 @@ func Execute() {
 }
 
 // placeholder for all subcommands
-func addCommands(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(statusCmd)
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(launchCmd)
-	rootCmd.AddCommand(closeCmd)
+func addCommands(rootCmd *cobra.Command, cfg *utils.ZestConfig) {
+	rootCmd.AddCommand(NewInitCmd(cfg))
+	rootCmd.AddCommand(NewConfigCmd(cfg))
+	rootCmd.AddCommand(NewStatusCmd(cfg))
+	rootCmd.AddCommand(NewListCmd(cfg))
+	rootCmd.AddCommand(NewLaunchCmd(cfg))
+	rootCmd.AddCommand(NewCloseCmd(cfg))
 }
 
-func NewRootCmd() *cobra.Command {
+func NewRootCmd(cfg *utils.ZestConfig) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zest",
 		Short: "Manage multiple workspaces from a unified CLI",
@@ -70,12 +70,15 @@ interface across platforms.
 You can create and switch between isolated workspaces such as work, personal, or learning.
 Each workspace can be initialized with custom templates for different use cases.`,
 		Version: VERSION,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			initConfig(cfg, cfgFile)
+		},
 	}
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zest/zest.yaml)")
 
 	// custom path to zest directory
-	rootCmd.PersistentFlags().StringVar(&utils.CustomZestDir, "custom", "", "custom zest directory (default is $HOME/.zest)")
+	rootCmd.PersistentFlags().StringVar(&cfg.ZestDir, "custom", "", "custom zest directory (default is $HOME/.zest)")
 
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
@@ -84,24 +87,24 @@ Each workspace can be initialized with custom templates for different use cases.
 	rootCmd.SetVersionTemplate(versionTemplate)
 
 	// initialization
-	cobra.OnInitialize(initConfig)
-	addCommands(rootCmd)
+	addCommands(rootCmd, cfg)
 
 	return rootCmd
 }
 
 func init() {
-	RootCmd = NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	RootCmd = NewRootCmd(cfg)
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
+func initConfig(cfg *utils.ZestConfig, cfgFile string) {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
-		cfgPath := utils.ZestDir()
+		cfgPath := cfg.RootDir()
 
 		// Zest configuration and state directory structure:
 		//
@@ -115,7 +118,7 @@ func initConfig() {
 		// │   └── workspace/                   // Per-workspace state files
 		// │       ├── [name of wsp].json       // State for each workspace
 		// Check for necessary directories.
-		cobra.CheckErr(utils.EnsureZestDirs())
+		cobra.CheckErr(cfg.EnsureDirs())
 
 		// config path at $HOME/.zest/zest.yaml
 		viper.AddConfigPath(cfgPath)

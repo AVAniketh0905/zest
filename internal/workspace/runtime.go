@@ -36,11 +36,11 @@ type WspRuntime struct {
 	IsDetached bool `json:"is_detached"` // Indicates if the workspace was launched in detached/background mode
 }
 
-func NewWspRuntime(wspName string) (*WspRuntime, error) {
+func NewWspRuntime(cfg *utils.ZestConfig, wspName string) (*WspRuntime, error) {
 	wspRt := &WspRuntime{}
 	wspRt.Name = wspName
 	wspRt.IsDetached = false // TODO: for now set to false
-	wspRt.RtFile = filepath.Join(utils.ZestRuntimeWspDir(), wspName+".json")
+	wspRt.RtFile = filepath.Join(cfg.RuntimeWspDir(), wspName+".json")
 	return wspRt, nil
 }
 

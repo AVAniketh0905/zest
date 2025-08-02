@@ -29,44 +29,40 @@ import (
 )
 
 // launchCmd represents the launch command
-var launchCmd = &cobra.Command{
-	Use:   "launch [workspace-name]",
-	Short: "Launch a workspace",
-	Long: `Launches the specified workspace, initializing its runtime state and executing
+func NewLaunchCmd(cfg *utils.ZestConfig) *cobra.Command {
+	var launchCmd = &cobra.Command{
+		Use:   "launch [workspace-name]",
+		Short: "Launch a workspace",
+		Long: `Launches the specified workspace, initializing its runtime state and executing
 its startup command.
 `,
-	Args: cobra.ExactArgs(1),
-	Example: `  zest launch work
+		Args: cobra.ExactArgs(1),
+		Example: `  zest launch work
   zest launch work --detach
   zest launch personal --dry-run
   zest launch work --env MODE=dev
   zest launch work --force
   zest launch personal --dry-run --env MODE=test --cmd "./custom-start.sh"`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := cmd.ValidateArgs(args); err != nil {
-			return err
-		}
-		return launchWorkspace(args[0])
-	},
-}
-
-func init() {
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// launchCmd.PersistentFlags().String("foo", "", "A help for foo")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmd.ValidateArgs(args); err != nil {
+				return err
+			}
+			return launchWorkspace(cfg, args[0])
+		},
+	}
 
 	launchCmd.Flags().Bool("dry-run", false, "Validate config and simulate launch without executing")
 	launchCmd.Flags().BoolP("detach", "d", false, "Run workspace in background")
 	launchCmd.Flags().StringToString("env", nil, "Set or override environment variables (e.g. --env KEY=VALUE)")
 	launchCmd.Flags().BoolP("force", "f", false, "Force launch even if workspace is active")
+
+	return launchCmd
 }
 
-func launchWorkspace(wspName string) error {
+func launchWorkspace(cfg *utils.ZestConfig, wspName string) error {
 	// log.Printf("[zest] starting launch sequence for workspace: %s", wspName)
 
-	wspReg, err := workspace.NewWspRegistry()
+	wspReg, err := workspace.NewWspRegistry(cfg)
 	if err != nil {
 		// log.Printf("[zest] error loading workspace registry: %v", err)
 		return err
@@ -85,14 +81,14 @@ func launchWorkspace(wspName string) error {
 	}
 	// log.Printf("[zest] workspace '%s' is valid and inactive", wspName)
 
-	plan, err := launch.NewLaunchPlan(wspName)
+	plan, err := launch.NewLaunchPlan(cfg, wspName)
 	if err != nil {
 		// log.Printf("[zest] failed to parse launch plan: %v", err)
 		return err
 	}
 	// log.Printf("[zest] parsed launch plan for workspace '%s'", wspName)
 
-	wspRt, err := workspace.NewWspRuntime(wspCfg.Name)
+	wspRt, err := workspace.NewWspRuntime(cfg, wspCfg.Name)
 	if err != nil {
 		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
 		return err

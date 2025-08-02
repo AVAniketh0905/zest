@@ -15,11 +15,12 @@ import (
 )
 
 func TestCloseCommand_RejectsInactiveWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
+
+	cfg := &utils.ZestConfig{}
 
 	// Init workspace (remains inactive)
-	rootCmd := cmd.NewRootCmd()
+	rootCmd := cmd.NewRootCmd(cfg)
 	rootCmd.SetArgs([]string{"init", "inactive", "--custom", tempDir})
 	rootCmd.SetOut(io.Discard)
 	rootCmd.SetErr(io.Discard)
@@ -38,11 +39,12 @@ func TestCloseCommand_RejectsInactiveWorkspace(t *testing.T) {
 }
 
 func TestCloseCommand_ClosesActiveWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
+
+	cfg := &utils.ZestConfig{}
 
 	// 1. Init workspace
-	rootCmd := cmd.NewRootCmd()
+	rootCmd := cmd.NewRootCmd(cfg)
 	rootCmd.SetArgs([]string{"init", "alpha", "--custom", tempDir})
 	rootCmd.SetOut(io.Discard)
 	rootCmd.SetErr(io.Discard)
@@ -61,13 +63,13 @@ func TestCloseCommand_ClosesActiveWorkspace(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	// 4. Assert runtime file is deleted
-	rtFile := filepath.Join(utils.ZestRuntimeWspDir(), "alpha.json")
+	rtFile := filepath.Join(cfg.RuntimeWspDir(), "alpha.json")
 	_, err := os.Stat(rtFile)
 	require.Error(t, err, "expected runtime file to be deleted")
 	require.True(t, os.IsNotExist(err))
 
 	// 5. Assert workspace.json status is now inactive
-	wsStateFile := filepath.Join(utils.ZestStateDir(), "workspaces.json")
+	wsStateFile := filepath.Join(cfg.StateDir(), "workspaces.json")
 	data, err := os.ReadFile(wsStateFile)
 	require.NoError(t, err)
 

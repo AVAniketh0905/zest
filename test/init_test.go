@@ -12,18 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTempDir() (string, func()) {
-	tempDir, _ := os.MkdirTemp("", "zest-test-*")
-	return tempDir, func() {
-		_ = os.RemoveAll(filepath.Join(tempDir, ".zest"))
-	}
+func setupTempDir(t *testing.T) string {
+	return t.TempDir()
 }
 
 func TestInitCommand_CreatesWorkspaceSuccessfully(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+
+	cmd := cmd.NewRootCmd(cfg)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
 	cmd.SetErr(io.Discard)
@@ -34,16 +32,16 @@ func TestInitCommand_CreatesWorkspaceSuccessfully(t *testing.T) {
 	require.Equal(t, "Initialized the workspace, work\n", buf.String())
 
 	// Assert workspace file created
-	wspFile := filepath.Join(utils.ZestWspDir(), "work.yaml")
+	wspFile := filepath.Join(cfg.WspDir(), "work.yaml")
 	_, err = os.Stat(wspFile)
 	require.NoError(t, err)
 }
 
 func TestInitCommand_RejectsMissingNameFlag(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	var errBuf bytes.Buffer
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(&errBuf)
@@ -55,10 +53,10 @@ func TestInitCommand_RejectsMissingNameFlag(t *testing.T) {
 }
 
 func TestInitCommand_RejectsEmptyWorkspaceName(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	var errBuf bytes.Buffer
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(&errBuf)
@@ -70,11 +68,11 @@ func TestInitCommand_RejectsEmptyWorkspaceName(t *testing.T) {
 }
 
 func TestInitCommand_RejectsDuplicateWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// First creation
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir})
@@ -92,11 +90,11 @@ func TestInitCommand_RejectsDuplicateWorkspace(t *testing.T) {
 }
 
 func TestInitCommand_ForceCreateExistingWsp(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// First creation
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"init", "duplicate", "--custom", tempDir})

@@ -30,37 +30,33 @@ import (
 )
 
 // closeCmd represents the close command
-var closeCmd = &cobra.Command{
-	Use:   "close [workspace-name]",
-	Short: "Close an existing or active workspace",
-	Long:  `Close a specific workspace by name, or use --all to close all workspaces.`,
-	Example: `  zest close work
+func NewCloseCmd(cfg *utils.ZestConfig) *cobra.Command {
+	var closeCmd = &cobra.Command{
+		Use:   "close [workspace-name]",
+		Short: "Close an existing or active workspace",
+		Long:  `Close a specific workspace by name, or use --all to close all workspaces.`,
+		Example: `  zest close work
   zest close --all                
   zest close work --force`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := cmd.ValidateArgs(args); err != nil {
-			return err
-		}
-		return closeWorkspace(args[0])
-	},
-}
-
-func init() {
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// closeCmd.PersistentFlags().String("foo", "", "A help for foo")
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmd.ValidateArgs(args); err != nil {
+				return err
+			}
+			return closeWorkspace(cfg, args[0])
+		},
+	}
 
 	closeCmd.Flags().BoolP("force", "f", false, "Force close the workspace even if it's active or has unsaved changes")
 	closeCmd.Flags().Bool("all", false, "Close all currently open workspaces")
+
+	return closeCmd
 }
 
-func closeWorkspace(wspName string) error {
+func closeWorkspace(cfg *utils.ZestConfig, wspName string) error {
 	// log.Printf("[zest] closing sequence for workspace: %s", wspName)
 
-	wspReg, err := workspace.NewWspRegistry()
+	wspReg, err := workspace.NewWspRegistry(cfg)
 	if err != nil {
 		// log.Printf("[zest] error loading workspace registry: %v", err)
 		return err
@@ -78,7 +74,7 @@ func closeWorkspace(wspName string) error {
 		return workspace.ErrWorkspaceIsInactive
 	}
 
-	wspRt, err := workspace.NewWspRuntime(wspCfg.Name)
+	wspRt, err := workspace.NewWspRuntime(cfg, wspCfg.Name)
 	if err != nil {
 		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
 		return err

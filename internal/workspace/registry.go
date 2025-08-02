@@ -18,8 +18,8 @@ type WspRegistry struct {
 }
 
 // NewWspRegistry loads the registry from disk or initializes an empty one.
-func NewWspRegistry() (*WspRegistry, error) {
-	regPath := filepath.Join(utils.ZestStateDir(), "workspaces.json")
+func NewWspRegistry(cfg *utils.ZestConfig) (*WspRegistry, error) {
+	regPath := filepath.Join(cfg.StateDir(), "workspaces.json")
 
 	reg := &WspRegistry{
 		path:       regPath,

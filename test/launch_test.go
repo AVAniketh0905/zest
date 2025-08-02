@@ -13,11 +13,11 @@ import (
 )
 
 func TestLaunchCommand_LaunchesInactiveWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Init workspace
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
@@ -42,10 +42,10 @@ func TestLaunchCommand_LaunchesInactiveWorkspace(t *testing.T) {
 }
 
 func TestLaunchCommand_FailsForNonExistentWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"launch", "ghost", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 
@@ -58,11 +58,11 @@ func TestLaunchCommand_FailsForNonExistentWorkspace(t *testing.T) {
 }
 
 func TestLaunchCommand_RejectsAlreadyActiveWorkspace(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Init
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
@@ -87,11 +87,11 @@ func TestLaunchCommand_RejectsAlreadyActiveWorkspace(t *testing.T) {
 }
 
 func TestLaunchCommand_CreatesRuntimeFile(t *testing.T) {
-	tempDir, cleanup := setupTempDir()
-	defer cleanup()
+	tempDir := setupTempDir(t)
 
 	// Init workspace
-	cmd := cmd.NewRootCmd()
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
@@ -104,12 +104,12 @@ func TestLaunchCommand_CreatesRuntimeFile(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	// Check runtime file exists
-	rtFile := filepath.Join(utils.ZestRuntimeWspDir(), "dev.json")
+	rtFile := filepath.Join(cfg.RuntimeWspDir(), "dev.json")
 	_, err := os.Stat(rtFile)
 	require.NoError(t, err, "expected runtime file to be created for launched workspace")
 
 	// Check workspace.json is updated
-	wsStateFile := filepath.Join(utils.ZestStateDir(), "workspaces.json")
+	wsStateFile := filepath.Join(cfg.StateDir(), "workspaces.json")
 	data, err := os.ReadFile(wsStateFile)
 	require.NoError(t, err)
 	require.Contains(t, string(data), `"dev"`)

@@ -43,7 +43,7 @@ type WspConfig struct {
 }
 
 // returns true if workspace with the given name already exists
-func checkName(name string, force bool) error {
+func checkName(cfg *utils.ZestConfig, name string, force bool) error {
 	if strings.TrimSpace(name) == "" {
 		return ErrInvalidWorkspaceName
 	}
@@ -55,7 +55,7 @@ func checkName(name string, force bool) error {
 	}
 
 	file := fmt.Sprintf("%v.yaml", name)
-	wspPath := filepath.Join(utils.ZestWspDir(), file)
+	wspPath := filepath.Join(cfg.WspDir(), file)
 
 	if _, err := os.Stat(wspPath); errors.Is(err, os.ErrNotExist) || force {
 		return nil
@@ -64,25 +64,25 @@ func checkName(name string, force bool) error {
 	return ErrWorkspaceExists
 }
 
-func Init(name, template string, force bool) error {
-	if err := checkName(name, force); err != nil {
+func Init(cfg *utils.ZestConfig, name, template string, force bool) error {
+	if err := checkName(cfg, name, force); err != nil {
 		return err
 	}
 
-	reg, err := NewWspRegistry()
+	reg, err := NewWspRegistry(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create a new registry, %v", err)
 	}
 
-	cfg := WspConfig{
+	wspCfg := WspConfig{
 		Name:     name,
 		Status:   Inactive,
 		Template: template,
 		Created:  time.Now().Format(time.RFC3339),
-		Path:     filepath.Join(utils.ZestWspDir(), name+".yaml"),
+		Path:     filepath.Join(cfg.WspDir(), name+".yaml"),
 		LastUsed: "never",
 	}
-	cfg.LastUpdated = cfg.Created
+	wspCfg.LastUpdated = wspCfg.Created
 
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -90,11 +90,11 @@ func Init(name, template string, force bool) error {
 	}
 
 	// write user editable workspace config file
-	if err := os.WriteFile(cfg.Path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write to worksapce config file at %v, %v", cfg.Path, err)
+	if err := os.WriteFile(wspCfg.Path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write to worksapce config file at %v, %v", wspCfg.Path, err)
 	}
 
-	reg.Update(&cfg)
+	reg.Update(&wspCfg)
 
 	if err := reg.Save(); err != nil {
 		return fmt.Errorf("failed to save workspace config, %v", err)

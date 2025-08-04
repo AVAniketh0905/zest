@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
@@ -37,38 +38,44 @@ func NewCloseCmd(cfg *utils.ZestConfig) *cobra.Command {
 		Long:  `Close a specific workspace by name, or use --all to close all workspaces.`,
 		Example: `  zest close work
   zest close --all                
-  zest close work --force`,
-		Args: cobra.ExactArgs(1),
+  zest close personal`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmd.ValidateArgs(args); err != nil {
 				return err
 			}
-			return closeWorkspace(cfg, args[0])
+
+			all, err := cmd.Flags().GetBool("all")
+			if err != nil {
+				return err
+			}
+
+			wspReg, err := workspace.NewWspRegistry(cfg)
+			if err != nil {
+				// log.Printf("[zest] error loading workspace registry: %v", err)
+				return err
+			}
+			// log.Printf("[zest] loaded workspace registry")
+
+			if all {
+				return closeAllWorkspaces(cfg, wspReg)
+			}
+
+			wspCfg, ok := wspReg.GetCfg(args[0])
+			if !ok {
+				return fmt.Errorf("failed to find workspace with %v", args[0])
+			}
+
+			return closeWorkspace(cfg, wspReg, wspCfg)
 		},
 	}
 
-	closeCmd.Flags().BoolP("force", "f", false, "Force close the workspace even if it's active or has unsaved changes")
 	closeCmd.Flags().Bool("all", false, "Close all currently open workspaces")
 
 	return closeCmd
 }
 
-func closeWorkspace(cfg *utils.ZestConfig, wspName string) error {
-	// log.Printf("[zest] closing sequence for workspace: %s", wspName)
-
-	wspReg, err := workspace.NewWspRegistry(cfg)
-	if err != nil {
-		// log.Printf("[zest] error loading workspace registry: %v", err)
-		return err
-	}
-	// log.Printf("[zest] loaded workspace registry")
-
-	wspCfg, ok := wspReg.GetCfg(wspName)
-	if !ok {
-		// log.Printf("[zest] workspace '%s' does not exist", wspName)
-		return workspace.ErrWorkspaceNotExists
-	}
-
+func closeWorkspace(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry, wspCfg *workspace.WspConfig) error {
 	if wspCfg.Status == workspace.Inactive {
 		// log.Printf("[zest] workspace '%s' is inactive", wspName)
 		return workspace.ErrWorkspaceIsInactive
@@ -107,5 +114,21 @@ func closeWorkspace(cfg *utils.ZestConfig, wspName string) error {
 		return err
 	}
 
+	return nil
+}
+
+func closeAllWorkspaces(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry) error {
+	for _, wspName := range wspReg.GetNames() {
+		wspCfg, ok := wspReg.GetCfg(wspName)
+		if !ok {
+			return fmt.Errorf("failed to find workspace with %v", wspName)
+		}
+
+		if wspCfg.Status == workspace.Active {
+			if err := closeWorkspace(cfg, wspReg, wspCfg); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

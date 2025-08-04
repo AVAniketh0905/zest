@@ -85,3 +85,61 @@ func TestCloseCommand_ClosesActiveWorkspace(t *testing.T) {
 	require.Equal(t, "inactive", strings.ToLower(wsp.Status))
 	require.NotEqual(t, "never", wsp.LastUsed)
 }
+
+func TestCloseCommand_ClosesAllActiveWorkspaces(t *testing.T) {
+	tempDir := setupTempDir(t)
+	cfg := &utils.ZestConfig{}
+
+	// Init root command
+	rootCmd := cmd.NewRootCmd(cfg)
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+
+	// Create two workspaces: one active, one inactive
+	workspaces := []string{"activeWsp", "inactiveWsp"}
+
+	// 1. Init both
+	for _, name := range workspaces {
+		rootCmd.SetArgs([]string{"init", name, "--custom", tempDir})
+		require.NoError(t, rootCmd.Execute())
+	}
+
+	// 2. Launch only the active workspace
+	rootCmd.SetArgs([]string{"launch", "activeWsp", "--custom", tempDir})
+	require.NoError(t, rootCmd.Execute())
+
+	// 3. Close all
+	rootCmd.SetArgs([]string{"close", "--all", "--custom", tempDir})
+	require.NoError(t, rootCmd.Execute())
+
+	// 4. Check runtime files
+	activeFile := filepath.Join(cfg.RuntimeWspDir(), "activeWsp.json")
+	inactiveFile := filepath.Join(cfg.RuntimeWspDir(), "inactiveWsp.json")
+
+	_, err := os.Stat(activeFile)
+	require.Error(t, err, "expected runtime file to be deleted")
+	require.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(inactiveFile)
+	require.Error(t, err, "expected no runtime file for inactive workspace")
+	require.True(t, os.IsNotExist(err))
+
+	// 5. Check workspace statuses
+	stateFile := filepath.Join(cfg.StateDir(), "workspaces.json")
+	data, err := os.ReadFile(stateFile)
+	require.NoError(t, err)
+
+	var wspState struct {
+		Workspaces map[string]struct {
+			Status   string `json:"status"`
+			LastUsed string `json:"last_used"`
+		} `json:"workspaces"`
+	}
+	require.NoError(t, json.Unmarshal(data, &wspState))
+
+	require.Equal(t, "inactive", strings.ToLower(wspState.Workspaces["activeWsp"].Status))
+	require.NotEqual(t, "never", wspState.Workspaces["activeWsp"].LastUsed)
+
+	require.Equal(t, "inactive", strings.ToLower(wspState.Workspaces["inactiveWsp"].Status))
+	require.Equal(t, "never", wspState.Workspaces["inactiveWsp"].LastUsed)
+}

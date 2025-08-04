@@ -225,3 +225,5 @@ func TestStatusCommand_JSONMode(t *testing.T) {
 	require.True(t, strings.HasPrefix(output, "{"), "Expected JSON object output")
 	require.Contains(t, output, "json-test")
 }
+
+// TODO: test watch for statusCmd

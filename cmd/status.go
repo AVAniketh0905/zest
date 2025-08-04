@@ -22,16 +22,25 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
-	"sync"
 	"text/tabwriter"
+	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
+
+type StatusReport struct {
+	Skipped   []string                `json:"skipped,omitempty"`
+	Inactive  []*workspace.WspConfig  `json:"inactive"`
+	Active    []*workspace.WspRuntime `json:"active"`
+	Timestamp string                  `json:"generated_at"`
+}
 
 // statusCmd represents the status command
 func NewStatusCmd(cfg *utils.ZestConfig) *cobra.Command {
@@ -52,67 +61,40 @@ If no workspace name is provided, the status of all open workspaces will be show
  zest status --watch`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmd.ValidateArgs(args); err != nil {
-				return err
-			}
-
-			// log.Println("[zest] status: initializing workspace registry")
-			wspReg, err := workspace.NewWspRegistry(cfg)
+			jsonOut, err := cmd.Flags().GetBool("json")
 			if err != nil {
 				return err
 			}
 
-			// filter args for proper workspaces
-			workspaces, skipped, err := filterArgs(wspReg.GetNames(), args)
+			verbose, err := cmd.Flags().GetBool("verbose")
 			if err != nil {
 				return err
 			}
 
-			inactiveCh := make(chan *workspace.WspConfig, 3) // BUG: deadlock if not buffere
-			activeCh := make(chan *workspace.WspRuntime, 3)
-
-			wg := sync.WaitGroup{}
-			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			defer func() {
-				// log.Println("[zest] status: flushing tabwriter")
-				tw.Flush()
-			}()
-
-			// Skipped Args
-			if len(args) != 0 {
-				fmt.Fprintln(tw, skipped)
-			}
-
-			// Writer goroutine
-			wg.Add(1)
-			go writerFunc(&wg, tw, inactiveCh, activeCh)
-
-			// goroutine for populating active and inactive channels
-			var g errgroup.Group
-
-			// Launch one goroutine per workspace
-			for _, wsp := range workspaces {
-				g.Go(func() error {
-					// log.Printf("[zest] status: checking workspace: %s", wsp)
-					return getWspData(cfg, wspReg, wsp, inactiveCh, activeCh)
-				})
-			}
-
-			// Wait for all workers and the writer
-			if err := g.Wait(); err != nil {
-				// log.Printf("[zest] status: error encountered: %v", err)
-				close(activeCh)
-				close(inactiveCh)
+			sinceStr, err := cmd.Flags().GetString("since")
+			if err != nil {
 				return err
 			}
 
-			// Close channels
-			// log.Println("[zest] status: all workspace goroutines finished, closing channels")
-			close(activeCh)
-			close(inactiveCh)
-			wg.Wait()
+			watch, err := cmd.Flags().GetBool("watch")
+			if err != nil {
+				return err
+			}
 
-			return nil
+			since, err := parseSinceFlag(sinceStr)
+			if err != nil {
+				return err
+			}
+
+			runOnce := func() error {
+				return runStatusOnce(cmd.OutOrStdout(), cfg, args, jsonOut, verbose, since)
+			}
+
+			if watch {
+				return watchStatus(cmd, runOnce)
+			}
+
+			return runOnce()
 		},
 	}
 
@@ -124,87 +106,200 @@ If no workspace name is provided, the status of all open workspaces will be show
 	return statusCmd
 }
 
-func filterArgs(original, args []string) ([]string, string, error) {
-	filter := []string{}
+func flatten[T comparable](s [][]T) []T {
+	var flat []T
+	for _, group := range s {
+		flat = append(flat, group...)
+	}
+	return flat
+}
 
-	origMap := make(map[string]bool)
-	for _, item := range original {
-		origMap[item] = true
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
+}
+
+func joinInts(ints []int) string {
+	if len(ints) == 0 {
+		return "-"
+	}
+	var out []string
+	for _, v := range ints {
+		out = append(out, strconv.Itoa(v))
+	}
+	return strings.Join(out, ",")
+}
+
+func wrapEmptyOutput(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "-"
+	}
+	return s
+}
+
+func parseSinceFlag(sinceStr string) (time.Time, error) {
+	var since time.Time
+	if sinceStr != "" {
+		dur, err := time.ParseDuration(sinceStr)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid duration for --since: %v", err)
+		}
+		since = time.Now().Add(-dur)
 	}
 
-	skipped := "Skipped "
+	return since, nil
+}
+
+func filterArgs(available, args []string) ([]string, []string) {
+	if len(args) == 0 {
+		return available, nil
+	}
+
+	availableMap := make(map[string]bool)
+	for _, name := range available {
+		availableMap[name] = true
+	}
+
+	var valid []string
+	var skipped []string
 	for _, arg := range args {
-		if _, ok := origMap[arg]; ok {
-			filter = append(filter, arg)
+		if availableMap[arg] {
+			valid = append(valid, arg)
 		} else {
-			skipped += arg + " "
+			skipped = append(skipped, arg)
 		}
 	}
 
-	if skipped == "Skipped " {
-		skipped += "None"
-	}
-
-	if len(filter) != 0 {
-		return filter, skipped, nil
-	}
-
-	return original, "Skipped *", nil
+	return valid, skipped
 }
 
-func writerFunc(wg *sync.WaitGroup, tw *tabwriter.Writer, inactiveCh <-chan *workspace.WspConfig, activeCh <-chan *workspace.WspRuntime) {
-	defer wg.Done()
-	// log.Println("[zest] status: starting writer goroutine")
-
-	// Inactive section
-	fmt.Fprintln(tw, "INACTIVE")
-	fmt.Fprintln(tw, "NAME\tSTATUS\tLAST_USED\tPATH")
-
-	for inactive := range inactiveCh {
-		// log.Printf("[zest] status: received inactive workspace: %s", inactive.Name)
-		fmt.Fprintf(tw, "%s\tInactive\t%s\t%s\n",
-			inactive.Name, inactive.LastUsed, inactive.Path)
+func renderJSON(w io.Writer, actives []*workspace.WspRuntime, inactives []*workspace.WspConfig, skipped []string) error {
+	report := StatusReport{
+		Skipped:   skipped,
+		Inactive:  inactives,
+		Active:    actives,
+		Timestamp: time.Now().Format(time.RFC3339),
 	}
-
-	// Active section
-	fmt.Fprintln(tw, "ACTIVE")
-	fmt.Fprintln(tw, "NAME\tSTATUS\tSTARTED_AT\tPIDS")
-
-	for active := range activeCh {
-		// log.Printf("[zest] status: received active workspace: %s", active.Name)
-		pidStrSlice := []string{}
-		for _, pid := range active.PIDs {
-			pidStrSlice = append(pidStrSlice, fmt.Sprint(pid))
-		}
-		fmt.Fprintf(tw, "%s\tActive\t%s\t%s\n",
-			active.Name, active.StartedAt, strings.Join(pidStrSlice, ","))
-	}
-
-	// log.Println("[zest] status: writer goroutine finished")
-}
-
-func getWspData(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry, wsp string, inactiveCh chan<- *workspace.WspConfig, activeCh chan<- *workspace.WspRuntime) error {
-	wspCfg, ok := wspReg.GetCfg(wsp)
-	if !ok || cfg == nil {
-		return fmt.Errorf("workspace %q not found or not initialized", wsp)
-	}
-
-	if wspCfg.Status == workspace.Inactive {
-		// log.Printf("[zest] status: workspace %q is inactive", wsp)
-		inactiveCh <- wspCfg
-		return nil
-	}
-
-	// log.Printf("[zest] status: workspace %q is active, loading runtime", wsp)
-	wspRt, err := workspace.NewWspRuntime(cfg, wsp)
+	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := wspRt.Load(); err != nil {
-		return fmt.Errorf("failed to load runtime for %q: %v", wsp, err)
+	fmt.Fprintln(w, string(data))
+	return nil
+}
+
+func renderStatusTable(w io.Writer, actives []*workspace.WspRuntime, inactives []*workspace.WspConfig, skipped []string, verbose bool) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+
+	if len(skipped) > 0 {
+		fmt.Fprintf(tw, "Skipped: %s\n", strings.Join(skipped, ", "))
 	}
 
-	// log.Printf("[zest] status: sending runtime for %q to channel", wsp)
-	activeCh <- wspRt
-	return nil
+	if len(inactives) > 0 {
+		fmt.Fprintln(tw, "\nINACTIVE WORKSPACES")
+		fmt.Fprintln(tw, "NAME\tSTATUS\tLAST_USED\tPATH")
+		for _, wsp := range inactives {
+			fmt.Fprintf(tw, "%s\tInactive\t%s\t%s\n", wsp.Name, wsp.LastUsed, wsp.Path)
+		}
+	}
+
+	if len(actives) > 0 {
+		fmt.Fprintln(tw, "\nACTIVE WORKSPACES")
+		fmt.Fprintln(tw, "NAME\tSTATUS\tSTARTED_AT\tPIDS\tPROCESSES")
+
+		for _, wsp := range actives {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+				wsp.Name,
+				"Active",
+				wsp.StartedAt,
+				truncate(joinInts(flatten(wsp.PIDs)), 30),
+				wrapEmptyOutput(strings.Join(wsp.Processes, ",")),
+			)
+		}
+		tw.Flush()
+
+		// Add space before verbose details
+		if verbose {
+			fmt.Fprintln(w, "\nExtra Details:")
+			for _, wsp := range actives {
+				fmt.Fprintf(w, "%s:\n", wsp.Name)
+				flatPids := flatten(wsp.PIDs)
+				if len(flatPids) > 6 {
+					fmt.Fprintf(w, "  PIDs: %s\n", joinInts(flatPids))
+				}
+				if len(wsp.Ports) > 0 {
+					fmt.Fprintf(w, "  Ports: %s\n", joinInts(wsp.Ports))
+				}
+				if len(wsp.BrowserURLs) > 0 {
+					fmt.Fprintf(w, "  URLs:      %s\n", strings.Join(wsp.BrowserURLs, ", "))
+				}
+				fmt.Fprintf(w, "  Detached:  %v\n\n", wsp.IsDetached)
+			}
+		}
+	} else {
+		fmt.Fprintln(w, "No active workspaces.")
+	}
+
+	return tw.Flush()
+}
+
+func runStatusOnce(w io.Writer, cfg *utils.ZestConfig, args []string, jsonOut, verbose bool, since time.Time) error {
+	wspReg, err := workspace.NewWspRegistry(cfg)
+	if err != nil {
+		return err
+	}
+
+	allWspNames := wspReg.GetNames()
+	selected, skipped := filterArgs(allWspNames, args)
+
+	var actives []*workspace.WspRuntime
+	var inactives []*workspace.WspConfig
+
+	for _, wsp := range selected {
+		wspCfg, ok := wspReg.GetCfg(wsp)
+		if !ok {
+			continue
+		}
+
+		if wspCfg.Status == workspace.Inactive {
+			inactives = append(inactives, wspCfg)
+			continue
+		}
+
+		rt, err := workspace.NewWspRuntime(cfg, wsp)
+		if err != nil {
+			continue
+		}
+		if err := rt.Load(); err != nil {
+			continue
+		}
+
+		if !since.IsZero() {
+			started, err := time.Parse(time.RFC3339, rt.StartedAt)
+			if err != nil || started.Before(since) {
+				continue
+			}
+		}
+
+		actives = append(actives, rt)
+	}
+
+	if jsonOut {
+		return renderJSON(w, actives, inactives, skipped)
+	}
+
+	return renderStatusTable(w, actives, inactives, skipped, verbose)
+}
+
+func watchStatus(cmd *cobra.Command, runOnce func() error) error {
+	for {
+		fmt.Fprintf(cmd.OutOrStdout(), "Updated @ %s\n", time.Now().Format(time.Kitchen))
+		if err := runOnce(); err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+		}
+		time.Sleep(5 * time.Second)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "\n---")
+	}
 }

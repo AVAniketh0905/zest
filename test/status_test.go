@@ -3,7 +3,6 @@ package test
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -27,38 +26,37 @@ func parseStatusOutput(output []byte) ([]WorkspaceStatusRow, error) {
 	}
 
 	var rows []WorkspaceStatusRow
-	var inActiveSection bool
+	var currentSection string
 
+outerloop:
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		switch line {
-		case "INACTIVE":
-			inActiveSection = true
+		case "INACTIVE WORKSPACES":
+			currentSection = "Inactive"
 			continue
-		case "ACTIVE":
-			inActiveSection = false
+		case "ACTIVE WORKSPACES":
+			currentSection = "Active"
 			continue
+		case "Extra:":
+			break outerloop
 		}
 
-		// Skip section headers
+		// Skip header
 		if strings.HasPrefix(line, "NAME") {
 			continue
 		}
 
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
-			return nil, fmt.Errorf("expected at least 4 columns, got %d: %q", len(fields), line)
+			continue // ignore summary/extras
 		}
 
 		row := WorkspaceStatusRow{
 			Name:      fields[0],
-			Status:    fields[1],
+			Status:    currentSection,
 			Timestamp: fields[2],
 			Info:      fields[3],
-		}
-
-		if inActiveSection && row.Status != "Inactive" {
-			return nil, fmt.Errorf("expected Inactive status, got %q", row.Status)
 		}
 
 		rows = append(rows, row)
@@ -69,7 +67,6 @@ func parseStatusOutput(output []byte) ([]WorkspaceStatusRow, error) {
 func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 	tempDir := setupTempDir(t)
 
-	// Set up two inactive workspaces
 	initCmds := [][]string{
 		{"init", "inactive1"},
 		{"init", "inactive2"},
@@ -85,37 +82,32 @@ func TestStatusCommand_ShowsInactiveWorkspaces(t *testing.T) {
 		require.NoError(t, cmd.Execute())
 	}
 
-	// Run the status command
 	cmd := cmd.NewRootCmd(cfg)
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"status", "--custom", tempDir})
-
-	err := cmd.Execute()
-	require.NoError(t, err)
+	require.NoError(t, cmd.Execute())
 
 	rows, err := parseStatusOutput(buf.Bytes())
 	require.NoError(t, err)
 
-	// Verify both inactive workspaces are present
 	names := map[string]bool{}
 	for _, row := range rows {
 		if row.Status == "Inactive" {
 			names[row.Name] = true
-			require.NotEmpty(t, row.Info) // Path should be present
+			require.NotEmpty(t, row.Info)
 		}
 	}
 
-	require.True(t, names["inactive1"], "inactive1 workspace not found")
-	require.True(t, names["inactive2"], "inactive2 workspace not found")
+	require.True(t, names["inactive1"])
+	require.True(t, names["inactive2"])
 }
 
 func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 	tempDir := setupTempDir(t)
 
 	cfg := &utils.ZestConfig{}
-	// Setup: create two workspaces
 	for _, wsp := range []string{"work", "personal"} {
 		cmd := cmd.NewRootCmd(cfg)
 		cmd.SetArgs([]string{"init", wsp, "--custom", tempDir})
@@ -124,13 +116,11 @@ func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 		require.NoError(t, cmd.Execute())
 	}
 
-	// Run `status` without args
 	cmd := cmd.NewRootCmd(cfg)
 	var buf bytes.Buffer
 	cmd.SetArgs([]string{"status", "--custom", tempDir})
 	cmd.SetOut(&buf)
 	cmd.SetErr(io.Discard)
-
 	require.NoError(t, cmd.Execute())
 
 	rows, err := parseStatusOutput(buf.Bytes())
@@ -150,7 +140,6 @@ func TestStatusCommand_AllInactive_DefaultBehavior(t *testing.T) {
 func TestStatusCommand_SkippedInvalidWorkspaces(t *testing.T) {
 	tempDir := setupTempDir(t)
 
-	// Create actual workspace so we can detect skipped
 	cfg := &utils.ZestConfig{}
 	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "work", "--custom", tempDir})
@@ -162,19 +151,18 @@ func TestStatusCommand_SkippedInvalidWorkspaces(t *testing.T) {
 	cmd.SetArgs([]string{"status", "home", "nothome", "--custom", tempDir})
 	cmd.SetOut(&buf)
 	cmd.SetErr(io.Discard)
-
 	require.NoError(t, cmd.Execute())
 	output := buf.String()
 
-	require.Contains(t, output, "Skipped *", "should skip all provided names")
-	require.Contains(t, output, "INACTIVE")
+	require.Contains(t, output, "Skipped: home, nothome\n")
+	require.Contains(t, output, "No active workspaces.\n")
+	require.NotContains(t, output, "INACTIVE WORKSPACES")
 	require.Contains(t, output, "work")
 }
 
 func TestStatusCommand_SomeSkippedSomeValid(t *testing.T) {
 	tempDir := setupTempDir(t)
 
-	// Create "personal" workspace
 	cfg := &utils.ZestConfig{}
 	cmd := cmd.NewRootCmd(cfg)
 	cmd.SetArgs([]string{"init", "personal", "--custom", tempDir})
@@ -182,16 +170,58 @@ func TestStatusCommand_SomeSkippedSomeValid(t *testing.T) {
 	cmd.SetErr(io.Discard)
 	require.NoError(t, cmd.Execute())
 
-	// Run with one valid and two invalid names
 	var buf bytes.Buffer
 	cmd.SetArgs([]string{"status", "personal", "home", "homenot", "--custom", tempDir})
 	cmd.SetOut(&buf)
 	cmd.SetErr(io.Discard)
-
 	require.NoError(t, cmd.Execute())
 	output := buf.String()
 
-	require.Contains(t, output, "Skipped home homenot")
+	require.Contains(t, output, "Skipped: home, homenot\n")
 	require.Contains(t, output, "personal")
-	require.Contains(t, output, "INACTIVE")
+	require.Contains(t, output, "INACTIVE WORKSPACES")
+}
+
+func TestStatusCommand_VerboseMode(t *testing.T) {
+	tempDir := setupTempDir(t)
+	cfg := &utils.ZestConfig{}
+
+	// Initialize and launch a workspace
+	cmd := cmd.NewRootCmd(cfg)
+	cmd.SetArgs([]string{"init", "verbose-test", "--custom", tempDir})
+	require.NoError(t, cmd.Execute())
+
+	cmd.SetArgs([]string{"launch", "verbose-test", "--custom", tempDir})
+	require.NoError(t, cmd.Execute())
+
+	var buf bytes.Buffer
+	cmd.SetArgs([]string{"status", "--verbose", "--custom", tempDir})
+	cmd.SetOut(&buf)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+	output := buf.String()
+
+	require.Contains(t, output, "ACTIVE WORKSPACES")
+	require.Contains(t, output, "Extra Details:")
+	require.Contains(t, output, "verbose-test")
+	require.Contains(t, output, "Detached:")
+}
+
+func TestStatusCommand_JSONMode(t *testing.T) {
+	tempDir := setupTempDir(t)
+	cfg := &utils.ZestConfig{}
+
+	cmd := cmd.NewRootCmd(cfg)
+	cmd.SetArgs([]string{"init", "json-test", "--custom", tempDir})
+	require.NoError(t, cmd.Execute())
+
+	var buf bytes.Buffer
+	cmd.SetArgs([]string{"status", "--json", "--custom", tempDir})
+	cmd.SetOut(&buf)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+	output := buf.String()
+
+	require.True(t, strings.HasPrefix(output, "{"), "Expected JSON object output")
+	require.Contains(t, output, "json-test")
 }

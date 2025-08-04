@@ -35,6 +35,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type WorkspaceView struct {
+	Name     string
+	Status   workspace.Status
+	LastUsed string
+	Path     string
+}
+
 // listCmd represents the list command
 func NewListCmd(cfg *utils.ZestConfig) *cobra.Command {
 	var listCmd = &cobra.Command{
@@ -79,13 +86,6 @@ last used timestamp, and configuration file path.`,
 	listCmd.Flags().String("sort", "name", "Sort by: name, last_used, status")
 
 	return listCmd
-}
-
-type WorkspaceView struct {
-	Name     string
-	Status   workspace.Status
-	LastUsed string
-	Path     string
 }
 
 func sortWsp(s []WorkspaceView, sortBy string) ([]WorkspaceView, error) {

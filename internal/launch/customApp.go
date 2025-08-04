@@ -1,7 +1,9 @@
 package launch
 
 import (
+	"log"
 	"os/exec"
+	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
 )
@@ -40,7 +42,12 @@ func (c *CustomApp) Start() error {
 		return err
 	}
 
-	c.pids = bef
+	newPIDs, err := utils.WaitForNewPIDs(c.GetName(), bef, 3*time.Second)
+	if err != nil {
+		log.Printf("[zest] warning: couldn't detect new PowerShell process in time")
+	}
+
+	c.pids = append(c.pids, newPIDs...)
 	return nil
 }
 

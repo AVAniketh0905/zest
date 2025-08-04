@@ -67,12 +67,25 @@ func (ls *Plan) parse(data []byte) error {
 			var app AppSpec
 
 			switch appType {
+			case "brave":
+				var brave BraveApp
+				if err := json.Unmarshal(appBytes, &brave); err != nil {
+					return err
+				}
+				app = &brave
 			case "custom":
 				var custom CustomApp
 				if err := json.Unmarshal(appBytes, &custom); err != nil {
 					return err
 				}
 				app = &custom
+			case "powershell":
+				var shell PowerShellApp
+				if err := json.Unmarshal(appBytes, &shell); err != nil {
+					return err
+				}
+				shell.SetWorkingDir(raw.WorkingDir)
+				app = &shell
 			}
 
 			ls.Apps = append(ls.Apps, app)

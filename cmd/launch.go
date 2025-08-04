@@ -152,15 +152,6 @@ func launchWorkspace(w io.Writer, cfg *utils.ZestConfig, opts LaunchOptions, wsp
 	wspRt.Update(plan)
 	// log.Printf("[zest] updated workspace runtime state")
 
-	// update pids with actual process pids
-	for i, pname := range wspRt.Processes {
-		after, err := utils.ListPIDs(pname)
-		if err != nil {
-			return err
-		}
-		wspRt.PIDs[i] = utils.Diff(after, wspRt.PIDs[i])
-	}
-
 	if err := wspRt.Save(); err != nil {
 		// log.Printf("[zest] failed to save workspace runtime state: %v", err)
 		return err

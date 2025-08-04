@@ -84,7 +84,7 @@ func Init(cfg *utils.ZestConfig, name, template string, force bool) error {
 	}
 	wspCfg.LastUpdated = wspCfg.Created
 
-	data, err := yaml.Marshal(cfg)
+	data, err := yaml.Marshal(wspCfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal yaml file, %s", err)
 	}

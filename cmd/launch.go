@@ -22,11 +22,21 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/AVAniketh0905/zest/internal/launch"
 	"github.com/AVAniketh0905/zest/internal/utils"
 	"github.com/AVAniketh0905/zest/internal/workspace"
 	"github.com/spf13/cobra"
 )
+
+type LaunchOptions struct {
+	DryRun bool
+	Detach bool
+	Env    map[string]string
+	Force  bool
+}
 
 // launchCmd represents the launch command
 func NewLaunchCmd(cfg *utils.ZestConfig) *cobra.Command {
@@ -42,12 +52,40 @@ its startup command.
   zest launch personal --dry-run
   zest launch work --env MODE=dev
   zest launch work --force
-  zest launch personal --dry-run --env MODE=test --cmd "./custom-start.sh"`,
+  zest launch personal --dry-run --env MODE=test`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmd.ValidateArgs(args); err != nil {
 				return err
 			}
-			return launchWorkspace(cfg, args[0])
+
+			dryRun, err := cmd.Flags().GetBool("dry-run")
+			if err != nil {
+				return err
+			}
+
+			detach, err := cmd.Flags().GetBool("detach")
+			if err != nil {
+				return err
+			}
+
+			env, err := cmd.Flags().GetStringToString("env")
+			if err != nil {
+				return err
+			}
+
+			force, err := cmd.Flags().GetBool("force")
+			if err != nil {
+				return err
+			}
+
+			opts := LaunchOptions{
+				DryRun: dryRun,
+				Detach: detach,
+				Env:    env,
+				Force:  force,
+			}
+
+			return launchWorkspace(cmd.OutOrStdout(), cfg, opts, args[0])
 		},
 	}
 
@@ -59,7 +97,7 @@ its startup command.
 	return launchCmd
 }
 
-func launchWorkspace(cfg *utils.ZestConfig, wspName string) error {
+func launchWorkspace(w io.Writer, cfg *utils.ZestConfig, opts LaunchOptions, wspName string) error {
 	// log.Printf("[zest] starting launch sequence for workspace: %s", wspName)
 
 	wspReg, err := workspace.NewWspRegistry(cfg)
@@ -75,7 +113,7 @@ func launchWorkspace(cfg *utils.ZestConfig, wspName string) error {
 		return workspace.ErrWorkspaceNotExists
 	}
 
-	if wspCfg.Status == workspace.Active {
+	if wspCfg.Status == workspace.Active && !opts.Force {
 		// log.Printf("[zest] workspace '%s' is already active", wspName)
 		return workspace.ErrWorkspaceIsActive
 	}
@@ -88,12 +126,22 @@ func launchWorkspace(cfg *utils.ZestConfig, wspName string) error {
 	}
 	// log.Printf("[zest] parsed launch plan for workspace '%s'", wspName)
 
+	if len(opts.Env) > 0 {
+		plan.ApplyEnv(opts.Env)
+	}
+
 	wspRt, err := workspace.NewWspRuntime(cfg, wspCfg.Name)
 	if err != nil {
 		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
 		return err
 	}
 	// log.Printf("[zest] initialized workspace runtime")
+
+	if opts.DryRun {
+		fmt.Printf("[zest] Dry-run mode: skipping actual launch. Launch plan:\n\n")
+		fmt.Fprintln(w, plan.Summary())
+		return nil
+	}
 
 	if err := plan.Start(); err != nil {
 		// log.Printf("[zest] failed to launch apps: %v", err)

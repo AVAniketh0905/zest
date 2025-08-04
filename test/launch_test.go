@@ -115,3 +115,95 @@ func TestLaunchCommand_CreatesRuntimeFile(t *testing.T) {
 	require.Contains(t, string(data), `"dev"`)
 	require.Contains(t, string(data), `"status": "active"`)
 }
+
+func TestLaunchCommand_RespectsDryRunFlag(t *testing.T) {
+	tempDir := setupTempDir(t)
+
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
+
+	// Init
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	// Launch with dry-run
+	var buf bytes.Buffer
+	cmd.SetArgs([]string{"launch", "dev", "--dry-run", "--custom", tempDir})
+	cmd.SetOut(&buf)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	output := buf.String()
+	require.Contains(t, output, "Launch Plan Summary")
+	require.Contains(t, output, "Workspace: dev")
+
+	// Runtime file should not exist
+	rtFile := filepath.Join(cfg.RuntimeWspDir(), "dev.json")
+	_, err := os.Stat(rtFile)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err))
+}
+
+func TestLaunchCommand_OverridesEnv(t *testing.T) {
+	tempDir := setupTempDir(t)
+
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
+
+	// Init
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	// Write simple app to dev.yaml
+	yamlPath := filepath.Join(cfg.WspDir(), "dev.yaml")
+	yamlContent := []byte(`
+name: dev
+apps:
+  custom:
+    - name: echoapp
+      cmd: echo
+      args: ["Hello", "World"]
+`)
+	require.NoError(t, os.WriteFile(yamlPath, yamlContent, 0644))
+
+	// Launch with dry-run and env
+	var buf bytes.Buffer
+	cmd.SetArgs([]string{"launch", "dev", "--custom", tempDir, "--dry-run", "--env", "MODE=test", "--env", "DEBUG=true"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	out := buf.String()
+	require.Contains(t, out, "Env:")
+	require.Contains(t, out, "MODE=test")
+	require.Contains(t, out, "DEBUG=true")
+}
+
+func TestLaunchCommand_ForceLaunchesActiveWorkspace(t *testing.T) {
+	tempDir := setupTempDir(t)
+
+	cfg := &utils.ZestConfig{}
+	cmd := cmd.NewRootCmd(cfg)
+
+	// Init
+	cmd.SetArgs([]string{"init", "dev", "--custom", tempDir})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	// First launch
+	cmd.SetArgs([]string{"launch", "dev", "--custom", tempDir})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	// Second launch with --force
+	cmd.SetArgs([]string{"launch", "dev", "--custom", tempDir, "--force"})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+}

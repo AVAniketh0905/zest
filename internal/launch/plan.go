@@ -12,6 +12,10 @@ import (
 type AppSpec interface {
 	GetName() string
 	GetPIDs() []int
+
+	SetEnv(map[string]string)
+
+	Summary() string
 	Start() error
 }
 
@@ -88,6 +92,12 @@ func (ls *Plan) Start() error {
 	return nil
 }
 
+func (ls *Plan) ApplyEnv(env map[string]string) {
+	for _, app := range ls.Apps {
+		app.SetEnv(env)
+	}
+}
+
 func (ls *Plan) GetProcessNames() []string {
 	names := []string{}
 	for _, app := range ls.Apps {
@@ -102,4 +112,20 @@ func (ls *Plan) GetPIDs() [][]int {
 		pids = append(pids, app.GetPIDs())
 	}
 	return pids
+}
+
+func (ls *Plan) Summary() string {
+	out := "Launch Plan Summary:\n"
+	out += "----------------------\n"
+	out += "Workspace: " + ls.Name + "\n"
+	if ls.WorkingDir != "" {
+		out += "Working Dir: " + ls.WorkingDir + "\n"
+	}
+	out += "\nApps:\n"
+
+	for _, app := range ls.Apps {
+		out += app.Summary()
+	}
+
+	return out
 }

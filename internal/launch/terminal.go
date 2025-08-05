@@ -3,7 +3,6 @@ package launch
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"runtime"
@@ -25,8 +24,7 @@ type PowerShellApp struct {
 func (p *PowerShellApp) GetName() string              { return "powershell" }
 func (p *PowerShellApp) GetPIDs() []int               { return p.pids }
 func (p *PowerShellApp) SetEnv(env map[string]string) { p.env = env }
-
-func (p *PowerShellApp) SetWorkingDir(dir string) { p.workingDir = dir }
+func (p *PowerShellApp) SetWorkingDir(dir string)     { p.workingDir = dir }
 
 func (p *PowerShellApp) Start() error {
 	if runtime.GOOS != "windows" {
@@ -75,7 +73,7 @@ func (p *PowerShellApp) Start() error {
 
 	newPIDs, err := utils.WaitForNewPIDs(p.GetName(), bef, 3*time.Second)
 	if err != nil {
-		log.Printf("[zest] warning: couldn't detect new PowerShell process in time")
+		return fmt.Errorf("[zest] warning: couldn't detect new PowerShell process in time")
 	}
 
 	p.pids = append(p.pids, newPIDs...)

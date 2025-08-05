@@ -1,7 +1,7 @@
 package launch
 
 import (
-	"log"
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -44,7 +44,7 @@ func (c *CustomApp) Start() error {
 
 	newPIDs, err := utils.WaitForNewPIDs(c.GetName(), bef, 3*time.Second)
 	if err != nil {
-		log.Printf("[zest] warning: couldn't detect new PowerShell process in time")
+		return fmt.Errorf("[zest] warning: couldn't detect new PowerShell process in time")
 	}
 
 	c.pids = append(c.pids, newPIDs...)

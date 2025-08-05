@@ -86,6 +86,19 @@ func (ls *Plan) parse(data []byte) error {
 				}
 				shell.SetWorkingDir(raw.WorkingDir)
 				app = &shell
+			case "vscode":
+				var vscode VSCodeApp
+				if err := json.Unmarshal(appBytes, &vscode); err != nil {
+					return err
+				}
+				vscode.SetWorkingDir(raw.WorkingDir)
+				app = &vscode
+			case "sioyek":
+				var sioyek SioyekApp
+				if err := json.Unmarshal(appBytes, &sioyek); err != nil {
+					return err
+				}
+				app = &sioyek
 			}
 
 			ls.Apps = append(ls.Apps, app)

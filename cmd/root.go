@@ -53,7 +53,6 @@ func Execute() {
 // placeholder for all subcommands
 func addCommands(rootCmd *cobra.Command, cfg *utils.ZestConfig) {
 	rootCmd.AddCommand(NewInitCmd(cfg))
-	rootCmd.AddCommand(NewConfigCmd(cfg))
 	rootCmd.AddCommand(NewStatusCmd(cfg))
 	rootCmd.AddCommand(NewListCmd(cfg))
 	rootCmd.AddCommand(NewLaunchCmd(cfg))

@@ -3,7 +3,10 @@ name: Zest Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Match semver tags like v1.0.0
+      - 'v*.*.*'
+
+permissions:
+  contents: write   
 
 jobs:
   build:
@@ -23,11 +26,6 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
-
-    - name: Set env vars
-      run: |
-        echo "GOOS=${{ matrix.goos }}" >> $GITHUB_ENV
-        echo "GOARCH=${{ matrix.goarch }}" >> $GITHUB_ENV
 
     - name: Build binary
       run: |

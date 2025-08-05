@@ -63,7 +63,7 @@ func NewRootCmd(cfg *utils.ZestConfig) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "zest",
 		Short: "Manage multiple workspaces from a unified CLI",
-		Long: `zest is a command-line tool to manage different workspaces with a simple
+		Long: `Zest is a command-line tool to manage different workspaces with a simple
 interface across platforms.
 
 You can create and switch between isolated workspaces such as work, personal, or learning.

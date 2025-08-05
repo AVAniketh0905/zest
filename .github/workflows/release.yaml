@@ -33,8 +33,9 @@ jobs:
       run: |
         mkdir -p dist
         EXT=""
-        if [ "${GOOS}" = "windows" ]; then EXT=".exe"; fi
-        go build -o dist/zest-${GOOS}-${GOARCH}${EXT} main.go
+        if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -o dist/zest-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} main.go
 
     - name: Upload release binaries
       uses: softprops/action-gh-release@v2

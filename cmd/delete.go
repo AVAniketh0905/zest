@@ -41,12 +41,10 @@ only if it is not currently running. You can use --force to delete even if it's 
   zest delete my-workspace --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate args early
 			if err := cmd.ValidateArgs(args); err != nil {
 				return err
 			}
 
-			// Check for --force flag
 			force, err := cmd.Flags().GetBool("force")
 			if err != nil {
 				return err
@@ -54,25 +52,21 @@ only if it is not currently running. You can use --force to delete even if it's 
 
 			wspName := args[0]
 
-			// Attempt to delete the workspace
 			return deleteWorkspace(cfg, cmd.OutOrStdout(), wspName, force)
 		},
 	}
 
-	// Optional --force flag
 	deleteCmd.Flags().BoolP("force", "f", false, "Force deletion even if the workspace is active")
 
 	return deleteCmd
 }
 
 func deleteWorkspace(cfg *utils.ZestConfig, w io.Writer, wspName string, force bool) error {
-	// Load workspace registry
 	wspReg, err := workspace.NewWspRegistry(cfg)
 	if err != nil {
 		return fmt.Errorf("unable to load workspace registry: %w", err)
 	}
 
-	// Fetch workspace config
 	wspCfg, ok := wspReg.GetCfg(wspName)
 	if !ok {
 		return fmt.Errorf("workspace '%s' not found", wspName)
@@ -87,18 +81,16 @@ func deleteWorkspace(cfg *utils.ZestConfig, w io.Writer, wspName string, force b
 	// If force is enabled, attempt to gracefully close the workspace first
 	if force && wspCfg.Status == workspace.Active {
 		fmt.Fprintf(w, "Force-deleting active workspace '%s'...\n", wspName)
-		if err := closeWorkspace(cfg, wspReg, wspCfg); err != nil {
+		if err := closeWorkspace(cfg, wspReg, wspCfg, w); err != nil {
 			return fmt.Errorf("failed to close active workspace '%s': %w", wspName, err)
 		}
 	}
 
-	// Proceed with deletion
 	fmt.Fprintf(w, "Deleting workspace '%s'...\n", wspName)
 	if err := wspReg.Delete(wspName); err != nil {
 		return fmt.Errorf("failed to delete workspace '%s': %w", wspName, err)
 	}
 
-	// Save the updated registry
 	if err := wspReg.Save(); err != nil {
 		return fmt.Errorf("failed to save updated registry: %w", err)
 	}

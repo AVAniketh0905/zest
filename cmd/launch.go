@@ -129,7 +129,7 @@ func launchWorkspace(w io.Writer, cfg *utils.ZestConfig, opts LaunchOptions, wsp
 
 	// Dry run mode
 	if opts.DryRun {
-		fmt.Fprintln(w, "[zest] Dry-run mode enabled. Launch plan preview:\n")
+		fmt.Fprintln(w, "[zest] Dry-run mode enabled. Launch plan preview:")
 		fmt.Fprintln(w, plan.Summary())
 		return nil
 	}

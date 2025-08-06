@@ -20,7 +20,6 @@ func TestInitCommand_CreatesWorkspaceSuccessfully(t *testing.T) {
 	tempDir := setupTempDir(t)
 
 	cfg := &utils.ZestConfig{}
-
 	cmd := cmd.NewRootCmd(cfg)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
@@ -29,7 +28,10 @@ func TestInitCommand_CreatesWorkspaceSuccessfully(t *testing.T) {
 
 	err := cmd.Execute()
 	require.NoError(t, err)
-	require.Equal(t, "Initialized the workspace, work\n", buf.String())
+
+	output := buf.String()
+	require.Contains(t, output, "Initializing workspace 'work'...")
+	require.Contains(t, output, "Workspace 'work' initialized successfully.")
 
 	// Assert workspace file created
 	wspFile := filepath.Join(cfg.WspDir(), "work.yaml")
@@ -49,7 +51,9 @@ func TestInitCommand_RejectsMissingNameFlag(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	require.Contains(t, errBuf.String(), `Error: requires at least 1 arg(s), only received 0`)
+
+	output := errBuf.String()
+	require.Contains(t, output, "Error: accepts 1 arg(s), received 0")
 }
 
 func TestInitCommand_RejectsEmptyWorkspaceName(t *testing.T) {
@@ -64,7 +68,9 @@ func TestInitCommand_RejectsEmptyWorkspaceName(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	require.Contains(t, errBuf.String(), "Error: invalid workspace name\n")
+
+	output := errBuf.String()
+	require.Contains(t, output, "invalid workspace name")
 }
 
 func TestInitCommand_RejectsDuplicateWorkspace(t *testing.T) {

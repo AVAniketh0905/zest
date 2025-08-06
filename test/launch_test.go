@@ -54,7 +54,7 @@ func TestLaunchCommand_FailsForNonExistentWorkspace(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "workspace does not exist")
+	require.Contains(t, err.Error(), "workspace 'ghost' does not exist")
 }
 
 func TestLaunchCommand_RejectsAlreadyActiveWorkspace(t *testing.T) {

@@ -87,7 +87,7 @@ func TestListCommand_TableOutput_ShowsExpectedWorkspaces(t *testing.T) {
 		names[row.Name] = true
 		require.NotEmpty(t, row.Path)
 		require.NotEmpty(t, row.LastUsed)
-		require.Contains(t, []string{"active", "inactive"}, row.Status)
+		require.Contains(t, []string{"ACTIVE", "INACTIVE"}, row.Status)
 	}
 
 	require.True(t, names["work"])

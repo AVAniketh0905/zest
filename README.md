@@ -1,6 +1,6 @@
 # Zest
 
-[![Zest CLI Tests](https://github.com/AVAniketh0905/zest/actions/workflows/cli_os_test.yml/badge.svg?branch=main)](https://github.com/AVAniketh0905/zest/actions)
+[![Zest CLI Tests](https://github.com/AVAniketh0905/zest/actions/workflows/cli_os_test.yaml/badge.svg)](https://github.com/AVAniketh0905/zest/actions/workflows/cli_os_test.yaml)
 
 Zest is a **cross-platform CLI tool** for managing isolated, project-specific **workspaces** with a single command.
 

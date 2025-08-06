@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/AVAniketh0905/zest/internal/utils"
@@ -35,100 +36,127 @@ func NewCloseCmd(cfg *utils.ZestConfig) *cobra.Command {
 	var closeCmd = &cobra.Command{
 		Use:   "close [workspace-name]",
 		Short: "Close an existing or active workspace",
-		Long:  `Close a specific workspace by name, or use --all to close all workspaces.`,
+		Long: `Close a specific workspace by name, or use --all to close all workspaces.
+
+Closing a workspace will stop its processes and mark it as inactive.`,
 		Example: `  zest close work
-  zest close --all                
-  zest close personal`,
+  zest close personal
+  zest close --all`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmd.ValidateArgs(args); err != nil {
 				return err
 			}
 
+			// Parse --all flag
 			all, err := cmd.Flags().GetBool("all")
 			if err != nil {
 				return err
 			}
 
+			// Load the workspace registry
 			wspReg, err := workspace.NewWspRegistry(cfg)
 			if err != nil {
-				// log.Printf("[zest] error loading workspace registry: %v", err)
-				return err
+				return fmt.Errorf("unable to load workspace registry: %w", err)
 			}
-			// log.Printf("[zest] loaded workspace registry")
 
 			if all {
-				return closeAllWorkspaces(cfg, wspReg)
+				return closeAllWorkspaces(cfg, wspReg, cmd.OutOrStdout())
 			}
 
-			wspCfg, ok := wspReg.GetCfg(args[0])
+			// Handle specific workspace close
+			if len(args) == 0 {
+				return fmt.Errorf("workspace name is required unless --all is used")
+			}
+
+			wspName := args[0]
+			wspCfg, ok := wspReg.GetCfg(wspName)
 			if !ok {
-				return fmt.Errorf("failed to find workspace with %v", args[0])
+				return fmt.Errorf("workspace '%s' not found", wspName)
 			}
 
-			return closeWorkspace(cfg, wspReg, wspCfg)
+			if err := closeWorkspace(cfg, wspReg, wspCfg, cmd.OutOrStdout()); err != nil {
+				return fmt.Errorf("failed to close workspace '%s': %w", wspName, err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Workspace '%s' closed successfully.\n", wspName)
+			return nil
 		},
 	}
 
 	closeCmd.Flags().Bool("all", false, "Close all currently open workspaces")
-
 	return closeCmd
 }
 
-func closeWorkspace(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry, wspCfg *workspace.WspConfig) error {
+func closeWorkspace(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry, wspCfg *workspace.WspConfig, w io.Writer) error {
+	// Skip if already inactive
 	if wspCfg.Status == workspace.Inactive {
-		// log.Printf("[zest] workspace '%s' is inactive", wspName)
+		fmt.Fprintf(w, "Workspace '%s' is already inactive.\n", wspCfg.Name)
 		return workspace.ErrWorkspaceIsInactive
 	}
 
+	// Initialize runtime for the workspace
 	wspRt, err := workspace.NewWspRuntime(cfg, wspCfg.Name)
 	if err != nil {
-		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
-		return err
+		return fmt.Errorf("failed to initialize runtime for '%s': %w", wspCfg.Name, err)
 	}
-	if err := wspRt.Load(); err != nil {
-		// log.Printf("[zest] failed to load workspace runtime: %v", err)
-		return err
-	}
-	// log.Printf("[zest] initialized workspace runtime")
 
-	// kill all processes
+	if err := wspRt.Load(); err != nil {
+		return fmt.Errorf("failed to load runtime for '%s': %w", wspCfg.Name, err)
+	}
+
+	// Kill all associated processes
 	for _, pids := range wspRt.PIDs {
-		for _, newPid := range pids {
-			if err := utils.Kill(newPid); err != nil {
-				return err
+		for _, pid := range pids {
+			if err := utils.Kill(pid); err != nil {
+				fmt.Fprintf(w, "Warning: failed to kill PID %d for workspace '%s': %v\n", pid, wspCfg.Name, err)
 			}
 		}
 	}
 
+	// Cleanup any leftover state or files
 	if err := wspRt.Delete(); err != nil {
-		// log.Printf("[zest] failed to delete process, %v", err)
-		return err
+		return fmt.Errorf("failed to cleanup runtime for '%s': %w", wspCfg.Name, err)
 	}
 
+	// Update registry
 	wspCfg.Status = workspace.Inactive
 	wspCfg.LastUsed = time.Now().Format(time.RFC3339)
 	wspReg.Update(wspCfg)
+
 	if err := wspReg.Save(); err != nil {
-		// log.Printf("[zest] failed to update workspace status in registry: %v", err)
-		return err
+		return fmt.Errorf("failed to update registry: %w", err)
 	}
 
 	return nil
 }
 
-func closeAllWorkspaces(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry) error {
+func closeAllWorkspaces(cfg *utils.ZestConfig, wspReg *workspace.WspRegistry, w io.Writer) error {
+	anyClosed := false
+
 	for _, wspName := range wspReg.GetNames() {
 		wspCfg, ok := wspReg.GetCfg(wspName)
 		if !ok {
-			return fmt.Errorf("failed to find workspace with %v", wspName)
+			fmt.Fprintf(w, "Skipping unknown workspace '%s'\n", wspName)
+			continue
 		}
 
 		if wspCfg.Status == workspace.Active {
-			if err := closeWorkspace(cfg, wspReg, wspCfg); err != nil {
-				return err
+			fmt.Fprintf(w, "Closing workspace '%s'...\n", wspName)
+			if err := closeWorkspace(cfg, wspReg, wspCfg, w); err != nil {
+				fmt.Fprintf(w, "Error closing workspace '%s': %v\n", wspName, err)
+				continue
 			}
+			fmt.Fprintf(w, "Workspace '%s' closed successfully.\n", wspName)
+			anyClosed = true
+		} else {
+			fmt.Fprintf(w, "Skipping '%s' — already inactive.\n", wspName)
 		}
 	}
+
+	if !anyClosed {
+		fmt.Fprintln(w, "No active workspaces found to close.")
+	}
+
 	return nil
 }

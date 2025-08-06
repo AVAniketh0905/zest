@@ -44,43 +44,51 @@ type WorkspaceView struct {
 
 // listCmd represents the list command
 func NewListCmd(cfg *utils.ZestConfig) *cobra.Command {
-	var listCmd = &cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available workspaces",
-		Long: `List all workspaces that have been initialized using 'zest init'.
+		Long: `Displays all initialized workspaces, showing status, last-used time, and path.
 
-This command reads from the internal workspace registry and displays metadata
-about each known workspace, such as its name, current status (open or closed),
-last used timestamp, and configuration file path.`,
-		Example: ` zest list
- zest list --json
- zest list --filter active
- zest list --sort last_used`,
+Supports optional filtering (active/inactive), sorting (name, status, last_used),
+and JSON output for automation or scripting.`,
+		Example: `  zest list
+  zest list --json
+  zest list --filter active
+  zest list --sort last_used`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filter, err := cmd.Flags().GetString("filter")
 			if err != nil {
 				return err
 			}
-
 			sortBy, err := cmd.Flags().GetString("sort")
 			if err != nil {
 				return err
 			}
+			isJSON, err := cmd.Flags().GetBool("json")
+			if err != nil {
+				return err
+			}
 
+			// Load and filter workspaces
 			wspData, err := getWorkspaces(cfg, strings.ToLower(filter), strings.ToLower(sortBy))
 			if err != nil {
 				return err
 			}
 
-			if isJson, err := cmd.Flags().GetBool("json"); err == nil && isJson {
-				return renderWorkspacesJSON(cmd.OutOrStdout(), wspData)
-			} else if err != nil {
-				return err
+			if len(wspData) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "No workspaces found.")
+				return nil
 			}
 
+			// Render output
+			if isJSON {
+				return renderWorkspacesJSON(cmd.OutOrStdout(), wspData)
+			}
 			return renderWorkspacesTable(cmd.OutOrStdout(), wspData)
 		},
 	}
+
+	// Flags
 	listCmd.Flags().Bool("json", false, "Output in JSON format")
 	listCmd.Flags().String("filter", "all", "Filter by status: active, inactive, all")
 	listCmd.Flags().String("sort", "name", "Sort by: name, last_used, status")
@@ -96,66 +104,73 @@ func sortWsp(s []WorkspaceView, sortBy string) ([]WorkspaceView, error) {
 		})
 	case "last_used":
 		sort.Slice(s, func(i, j int) bool {
-			return s[i].LastUsed < s[j].LastUsed // string sort (or parse time if needed)
+			return s[i].LastUsed < s[j].LastUsed // can improve with parsed times
 		})
 	case "status":
 		sort.Slice(s, func(i, j int) bool {
 			return strings.ToLower(string(s[i].Status)) < strings.ToLower(string(s[j].Status))
 		})
 	case "":
+		return s, nil
 	default:
-		return nil, fmt.Errorf("invalid sort key: %s (must be name, last_used, or status)", sortBy)
+		return nil, fmt.Errorf("invalid sort key: '%s' (expected: name, last_used, or status)", sortBy)
 	}
-
 	return s, nil
 }
 
 func getWorkspaces(cfg *utils.ZestConfig, filter string, sortBy string) ([]WorkspaceView, error) {
 	wspReg, err := workspace.NewWspRegistry(cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load workspace registry: %w", err)
 	}
 
 	var result []WorkspaceView
 	for _, wsp := range wspReg.Workspaces {
-		if filter != "all" && wsp.Status != workspace.Status(filter) {
+		if filter != "all" && string(wsp.Status) != filter {
 			continue
 		}
 
-		_, trimPath, found := strings.Cut(wsp.Path, ".")
+		// Display-friendly path trimming
+		_, trimmed, found := strings.Cut(wsp.Path, ".")
 		if found {
-			trimPath = filepath.Join("~", "."+trimPath)
+			trimmed = filepath.Join("~", "."+trimmed)
+		} else {
+			trimmed = wsp.Path
 		}
 
 		result = append(result, WorkspaceView{
 			Name:     wsp.Name,
 			Status:   wsp.Status,
 			LastUsed: wsp.LastUsed,
-			Path:     trimPath,
+			Path:     trimmed,
 		})
 	}
 
-	return sortWsp(result, sortBy)
+	sorted, err := sortWsp(result, sortBy)
+	if err != nil {
+		return nil, err
+	}
+
+	return sorted, nil
 }
 
 func renderWorkspacesJSON(w io.Writer, workspaces []WorkspaceView) error {
-	rawJson, err := json.MarshalIndent(workspaces, "", "  ")
+	data, err := json.MarshalIndent(workspaces, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal workspace data: %w", err)
+		return fmt.Errorf("failed to encode workspace data to JSON: %w", err)
 	}
-
-	_, err = w.Write(rawJson)
+	_, err = w.Write(data)
 	return err
 }
 
 func renderWorkspacesTable(w io.Writer, workspaces []WorkspaceView) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tSTATUS\tLAST_USED\tPATH")
+	fmt.Fprintln(tw, "NAME\tSTATUS\tLAST USED\tPATH")
 
 	for _, wsp := range workspaces {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
 			wsp.Name,
-			wsp.Status,
+			strings.ToUpper(string(wsp.Status)),
 			wsp.LastUsed,
 			wsp.Path,
 		)

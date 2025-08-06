@@ -3,6 +3,7 @@ package workspace
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -78,4 +79,18 @@ func (wr *WspRegistry) GetNames() []string {
 func (wr *WspRegistry) Exists(name string) bool {
 	_, ok := wr.Workspaces[name]
 	return ok
+}
+
+func (wr *WspRegistry) Delete(name string) error {
+	wspCfg, ok := wr.Workspaces[name]
+	if !ok {
+		return fmt.Errorf("failed to find workspace with %v ", name)
+	}
+
+	if err := os.Remove(wspCfg.Path); err != nil {
+		return err
+	}
+
+	delete(wr.Workspaces, name)
+	return nil
 }

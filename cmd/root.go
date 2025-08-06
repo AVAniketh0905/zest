@@ -57,6 +57,7 @@ func addCommands(rootCmd *cobra.Command, cfg *utils.ZestConfig) {
 	rootCmd.AddCommand(NewListCmd(cfg))
 	rootCmd.AddCommand(NewLaunchCmd(cfg))
 	rootCmd.AddCommand(NewCloseCmd(cfg))
+	rootCmd.AddCommand(NewDeleteCmd(cfg))
 }
 
 func NewRootCmd(cfg *utils.ZestConfig) *cobra.Command {

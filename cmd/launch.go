@@ -44,35 +44,30 @@ func NewLaunchCmd(cfg *utils.ZestConfig) *cobra.Command {
 		Use:   "launch [workspace-name]",
 		Short: "Launch a workspace",
 		Long: `Launches the specified workspace, initializing its runtime state and executing
-its startup command.
-`,
-		Args: cobra.ExactArgs(1),
+its startup plan. You can use --env to inject environment variables, --dry-run to preview,
+or --detach to run in background.`,
 		Example: `  zest launch work
   zest launch work --detach
   zest launch personal --dry-run
   zest launch work --env MODE=dev
   zest launch work --force
   zest launch personal --dry-run --env MODE=test`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmd.ValidateArgs(args); err != nil {
-				return err
-			}
+			wspName := args[0]
 
 			dryRun, err := cmd.Flags().GetBool("dry-run")
 			if err != nil {
 				return err
 			}
-
 			detach, err := cmd.Flags().GetBool("detach")
 			if err != nil {
 				return err
 			}
-
 			env, err := cmd.Flags().GetStringToString("env")
 			if err != nil {
 				return err
 			}
-
 			force, err := cmd.Flags().GetBool("force")
 			if err != nil {
 				return err
@@ -85,7 +80,7 @@ its startup command.
 				Force:  force,
 			}
 
-			return launchWorkspace(cmd.OutOrStdout(), cfg, opts, args[0])
+			return launchWorkspace(cmd.OutOrStdout(), cfg, opts, wspName)
 		},
 	}
 
@@ -98,74 +93,66 @@ its startup command.
 }
 
 func launchWorkspace(w io.Writer, cfg *utils.ZestConfig, opts LaunchOptions, wspName string) error {
-	// log.Printf("[zest] starting launch sequence for workspace: %s", wspName)
+	fmt.Fprintf(w, "Launching workspace '%s'...\n", wspName)
 
 	wspReg, err := workspace.NewWspRegistry(cfg)
 	if err != nil {
-		// log.Printf("[zest] error loading workspace registry: %v", err)
-		return err
+		return fmt.Errorf("unable to load workspace registry: %w", err)
 	}
-	// log.Printf("[zest] loaded workspace registry")
 
 	wspCfg, ok := wspReg.GetCfg(wspName)
 	if !ok {
-		// log.Printf("[zest] workspace '%s' does not exist", wspName)
-		return workspace.ErrWorkspaceNotExists
+		return fmt.Errorf("workspace '%s' does not exist", wspName)
 	}
 
+	// Block if already active and not forcing
 	if wspCfg.Status == workspace.Active && !opts.Force {
-		// log.Printf("[zest] workspace '%s' is already active", wspName)
+		fmt.Fprintf(w, "Workspace '%s' is already active. Use --force to re-launch.\n", wspName)
 		return workspace.ErrWorkspaceIsActive
 	}
-	// log.Printf("[zest] workspace '%s' is valid and inactive", wspName)
 
+	// Build launch plan
 	plan, err := launch.NewLaunchPlan(cfg, wspName)
 	if err != nil {
-		// log.Printf("[zest] failed to parse launch plan: %v", err)
-		return err
+		return fmt.Errorf("failed to create launch plan for '%s': %w", wspName, err)
 	}
-	// log.Printf("[zest] parsed launch plan for workspace '%s'", wspName)
 
 	if len(opts.Env) > 0 {
+		fmt.Fprintf(w, "Applying environment variables: %v\n", opts.Env)
 		plan.ApplyEnv(opts.Env)
 	}
 
 	wspRt, err := workspace.NewWspRuntime(cfg, wspCfg.Name)
 	if err != nil {
-		// log.Printf("[zest] failed to initialize workspace runtime: %v", err)
-		return err
+		return fmt.Errorf("failed to initialize runtime for '%s': %w", wspName, err)
 	}
-	// log.Printf("[zest] initialized workspace runtime")
 
+	// Dry run mode
 	if opts.DryRun {
-		fmt.Printf("[zest] Dry-run mode: skipping actual launch. Launch plan:\n\n")
+		fmt.Fprintln(w, "[zest] Dry-run mode enabled. Launch plan preview:\n")
 		fmt.Fprintln(w, plan.Summary())
 		return nil
 	}
 
+	// Start execution of the plan
+	fmt.Fprintln(w, "Starting launch...")
 	if err := plan.Start(); err != nil {
-		// log.Printf("[zest] failed to launch apps: %v", err)
-		return err
+		return fmt.Errorf("failed to launch workspace '%s': %w", wspName, err)
 	}
-	// log.Printf("[zest] launched apps successfully")
 
+	// Update and persist runtime state
 	wspRt.Update(plan)
-	// log.Printf("[zest] updated workspace runtime state")
-
 	if err := wspRt.Save(); err != nil {
-		// log.Printf("[zest] failed to save workspace runtime state: %v", err)
-		return err
+		return fmt.Errorf("failed to save runtime state: %w", err)
 	}
-	// log.Printf("[zest] saved workspace runtime state")
 
+	// Mark workspace as active
 	wspCfg.Status = workspace.Active
 	wspReg.Update(wspCfg)
 	if err := wspReg.Save(); err != nil {
-		// log.Printf("[zest] failed to update workspace status in registry: %v", err)
-		return err
+		return fmt.Errorf("failed to update registry: %w", err)
 	}
-	// log.Printf("[zest] workspace '%s' marked as active and registry saved", wspName)
 
-	// log.Printf("[zest] workspace launch completed successfully for '%s'", wspName)
+	fmt.Fprintf(w, "Workspace '%s' launched successfully.\n", wspName)
 	return nil
 }

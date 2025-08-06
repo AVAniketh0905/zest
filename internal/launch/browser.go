@@ -2,7 +2,6 @@ package launch
 
 import (
 	"fmt"
-	"log"
 	"os/exec"
 	"runtime"
 	"time"
@@ -61,8 +60,6 @@ func (b *BraveApp) Start() error {
 	if err != nil {
 		return fmt.Errorf("[zest] warning: couldn't detect new PowerShell process in time")
 	}
-
-	log.Println("new pids: ", newPIDs)
 
 	b.pids = append(b.pids, newPIDs...)
 	return nil

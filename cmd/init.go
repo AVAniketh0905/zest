@@ -29,56 +29,57 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	template string
-	force    bool
-)
-
 // initCmd represents the init command
 func NewInitCmd(cfg *utils.ZestConfig) *cobra.Command {
 	initCmd := &cobra.Command{
 		Use:   "init [workspace-name]",
 		Short: "Initialize a new workspace",
-		Long: `The init command creates a new workspace with the given name, setting up the
-necessary directory structure and optional template files.
+		Long: `Initializes a new workspace with the given name, setting up directories
+and optionally applying a template for scaffolding.
 
 Workspaces are isolated environments used for organizing different contexts like
 work, personal, or learning projects.
 
-You can optionally specify a template to scaffold the workspace with predefined files.
-Use --force to overwrite existing workspaces if necessary.
-`,
-		Example: `  zest init work 
-  zest init work --template [template-name]
+Use --force to overwrite an existing workspace.`,
+		Example: `  zest init work
+  zest init work --template dev-template
   zest init work --force
   zest init personal`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmd.ValidateArgs(args); err != nil {
+			wspName := args[0]
+
+			force, err := cmd.Flags().GetBool("force")
+			if err != nil {
 				return err
 			}
-			wspName := args[0] // TODO: multiple workspaces
-
-			if force {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Force enabled: existing workspaces will be overwritten.")
-			}
-
-			if template != "" {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Using template: %s\n", template)
-			}
-
-			err := workspace.Init(cfg, wspName, template, force) // TODO: template
+			template, err := cmd.Flags().GetString("template")
 			if err != nil {
 				return err
 			}
 
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), "Initialized the workspace,", wspName)
-			return err
+			// Display user-facing info
+			fmt.Fprintf(cmd.OutOrStdout(), "Initializing workspace '%s'...\n", wspName)
+
+			if force {
+				fmt.Fprintln(cmd.OutOrStdout(), "Force enabled: existing workspace will be overwritten if present.")
+			}
+			if template != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Using template: %s\n", template)
+			}
+
+			if err := workspace.Init(cfg, wspName, template, force); err != nil {
+				return fmt.Errorf("failed to initialize workspace '%s': %w", wspName, err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Workspace '%s' initialized successfully.\n", wspName)
+			return nil
 		},
 	}
 
-	initCmd.Flags().StringVarP(&template, "template", "t", "", "Template to use for workspace scaffolding")
-	initCmd.Flags().BoolVarP(&force, "force", "f", false, "Force initialization even if workspace already exists")
+	// Optional Flags
+	initCmd.Flags().StringP("template", "t", "", "Template to use for workspace scaffolding")
+	initCmd.Flags().BoolP("force", "f", false, "Force initialization even if workspace already exists")
 
 	return initCmd
 }
